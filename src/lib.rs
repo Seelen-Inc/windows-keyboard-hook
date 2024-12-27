@@ -4,9 +4,6 @@
 //! It provides an ergonomic API for setting up keyboard hooks, registering hotkeys,
 //! and handling keyboard events in a safe manner.
 
-#[cfg(not(target_os = "windows"))]
-compile_error!("Only supported on Windows");
-
 #[cfg(windows)]
 pub mod error;
 #[cfg(windows)]
