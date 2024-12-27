@@ -11,9 +11,6 @@ categories = ["os::windows-apis", "api-bindings"]
 keywords = ["hotkey", "windows", "keyboard", "global", "win32"]
 edition = "2021"
 
-[package.metadata.docs.rs]
-doc-scrape-examples = false
-
 [dependencies]
 windows = { version = "0.52", features = [
     "Win32_Foundation",
@@ -22,3 +19,11 @@ windows = { version = "0.52", features = [
 ]}
 thiserror = "2.0.4"
 crossbeam-channel = "0.5.14"
+
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
+targets = [
+    "aarch64-pc-windows-msvc",
+    "i686-pc-windows-msvc",
+    "x86_64-pc-windows-msvc",
+]
