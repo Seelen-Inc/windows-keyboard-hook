@@ -1,10 +1,10 @@
 [package]
 name = "win-hotkeys"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 repository = "https://github.com/iholston/win-hotkeys"
 homepage = "https://github.com/iholston/win-hotkeys"
-documentation = "https://docs.rs/crate/win-hotkeys/0.1.0"
+documentation = "https://docs.rs/win-hotkeys"
 readme = "README.md"
 description = "A simple thread safe rust library for system-wide hotkey management on Windows"
 categories = ["os::windows-apis", "api-bindings"]
