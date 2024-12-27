@@ -9,7 +9,7 @@ all interactions related to registering hotkeys and handling their events. Unlik
 solutions, this crate does not rely on the `RegisterHotKey` Windows function. Instead, it 
 leverages a low-level keyboard hook to provide a more flexible and powerful way to monitor 
 global hotkeys. This approach, allows for additional functionality (i.e. WIN key as modifier) and 
-bypasses some of the limitations of RegisterHotKey.
+bypasses limitations of RegisterHotKey.
 
 ---
 
@@ -35,7 +35,7 @@ fn main() {
 ```
 
 ## Examples
-Up-to-date examples can always be found [here](/examples)
+Up-to-date examples can always be found in the [examples directory](https://github.com/iholston/win-hotkeys/tree/main/examples)
 
 ## License
 
