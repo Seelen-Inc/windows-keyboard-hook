@@ -6,7 +6,7 @@
 
 The `win-hotkeys` crate simplifies working with the Windows API by abstracting and managing 
 all interactions related to registering hotkeys and handling their events. Unlike many other 
-solutions, this crate does not rely on the RegisterHotKey Windows function. Instead, it 
+solutions, this crate does not rely on the `RegisterHotKey` Windows function. Instead, it 
 leverages a low-level keyboard hook to provide a more flexible and powerful way to monitor 
 global hotkeys. This approach, allows for additional functionality (i.e. WIN key as modifier) and 
 bypasses some of the limitations of RegisterHotKey.
