@@ -35,7 +35,7 @@ fn main() {
 ```
 
 ## Examples
-Up-to-date examples can always be found [here](win-hotkeys/examples)
+Up-to-date examples can always be found [here](/examples)
 
 ## License
 
