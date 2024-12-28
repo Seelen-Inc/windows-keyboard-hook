@@ -33,6 +33,39 @@ fn main() {
     hkm.event_loop();
 }
 ```
+## Keys
+`win-hotkeys` provides a `VKey` and `ModKey` enum that abstracts the Windows Virtual Key (VK) codes. These keys
+are used to specify the hotkeys available for registration.
+
+```rust
+fn main() {
+    let vk_a1 = VKey::A;
+    let vk_a2 = VKey::from_keyname("a").unwrap();
+    let vk_a3 = VKey::from_keyname("A").unwrap();
+    let vk_a4 = VKey::from_keyname("0x41").unwrap();
+    let vk_a5 = VKey::from_vk_code(0x41);
+    let vk_a6 = VKey::CustomKeyCode(0x41);
+
+    assert_eq!(vk_a1, vk_a2);
+    assert_eq!(vk_a1, vk_a3);
+    assert_eq!(vk_a1, vk_a4);
+    assert_eq!(vk_a1, vk_a5);
+    assert_eq!(vk_a1, vk_a6);
+
+    let mod_alt1 = ModKey::Alt;
+    let mod_alt2 = ModKey::from_keyname("alt").unwrap();
+    let mod_alt3 = ModKey::from_keyname("VK_LMENU").unwrap();
+    let mod_alt4 = ModKey::from_keyname("OxA4").unwrap();
+    let mod_alt5 = ModKey::from_vk_code(0xA4).unwrap();
+
+    assert_eq!(mod_alt1, mod_alt2);
+    assert_eq!(mod_alt1, mod_alt3);
+    assert_eq!(mod_alt1, mod_alt4);
+    assert_eq!(mod_alt1, mod_alt5);
+}
+```
+
+For a full list of supported keys, refer to the [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
 
 ## Examples
 Up-to-date examples can always be found in the [examples directory](https://github.com/iholston/win-hotkeys/tree/main/examples)

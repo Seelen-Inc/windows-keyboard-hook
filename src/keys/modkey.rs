@@ -19,19 +19,22 @@ pub enum ModKey {
 impl ModKey {
     /// Creates a `ModKey` from a string representation.
     ///
-    /// # Supported Values
-    /// - "CTRL" or "CONTROL"
-    /// - "SHIFT"
-    /// - "ALT"
-    /// - "WIN", "WINDOWS", or "SUPER"
+    /// # See Also
+    /// - [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
     pub fn from_keyname(name: &str) -> Result<ModKey, WHKError> {
-        Ok(match name.to_ascii_uppercase().as_ref() {
-            "CTRL" | "CONTROL" => ModKey::Ctrl,
-            "SHIFT" => ModKey::Shift,
-            "ALT" => ModKey::Alt,
-            "WIN" | "WINDOWS" | "SUPER" => ModKey::Win,
-            val => return Err(WHKError::InvalidModKey(val.to_string())),
-        })
+        Ok(
+            match name.to_ascii_uppercase().trim_start_matches("VK_").as_ref() {
+                "CTRL" | "CONTROL" | "LCONTROL" | "RCONTROL" => ModKey::Ctrl,
+                "OX11" | "OXA2" | "OXA3" => ModKey::Ctrl,
+                "SHIFT" | "LSHIFT" | "RSHIFT" => ModKey::Shift,
+                "OX10" | "OXA0" | "OXA1" => ModKey::Shift,
+                "ALT" | "MENU" | "LMENU" | "RMENU" => ModKey::Alt,
+                "OX12" | "OXA4" | "OXA5" => ModKey::Alt,
+                "WIN" | "WINDOWS" | "SUPER" | "LWIN" | "RWIN" => ModKey::Win,
+                "OX5B" | "OX5C" => ModKey::Win,
+                val => return Err(WHKError::InvalidModKey(val.to_string())),
+            },
+        )
     }
 
     /// Converts the `ModKey` to its corresponding Windows virtual key (VK) code.

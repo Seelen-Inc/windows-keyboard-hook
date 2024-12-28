@@ -500,6 +500,16 @@ impl VKey {
     ///
     pub fn from_keyname(name: &str) -> Result<VKey, WHKError> {
         let name = name.to_ascii_uppercase();
+
+        // 1 byte hex code => Use the raw keycode value
+        if name.len() >= 3 && name.len() <= 6 && name.starts_with("0x") || name.starts_with("0X") {
+            if let Ok(val) = u16::from_str_radix(&name[2..], 16) {
+                return Ok(Self::CustomKeyCode(val));
+            } else {
+                return Err(WHKError::InvalidKey(name));
+            }
+        }
+
         Ok(match name.trim_start_matches("VK_") {
             "BACK" => VKey::Back,
             "TAB" => VKey::Tab,
@@ -841,7 +851,6 @@ impl TryInto<ModKey> for VKey {
 
 impl std::str::FromStr for VKey {
     type Err = WHKError;
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         VKey::from_keyname(s)
     }
@@ -879,6 +888,10 @@ mod tests {
         assert_eq!(VKey::from_keyname("BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_keyname("VK_BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_keyname("RETURN").unwrap(), VKey::Return);
+        assert_eq!(
+            VKey::from_keyname("0x29").unwrap(),
+            VKey::CustomKeyCode(0x29)
+        );
         assert!(VKey::from_keyname("INVALID_KEY").is_err());
     }
 
@@ -913,7 +926,6 @@ mod tests {
     #[test]
     fn test_from_str() {
         use std::str::FromStr;
-
         assert_eq!(VKey::from_str("BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_str("VK_BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_str("INVALID_KEY").is_err(), true);
