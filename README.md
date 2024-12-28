@@ -11,8 +11,6 @@ leverages a `WH_KEYBOARD_LL` hook to provide a more flexible and powerful way to
 global hotkeys. This approach, allows for additional functionality (i.e. WIN key as modifier) and 
 bypasses limitations of RegisterHotKey.
 
----
-
 ```toml
 [dependencies]
 win-hotkeys = "0.1.0"
@@ -34,7 +32,7 @@ fn main() {
 }
 ```
 ## Keys
-`win-hotkeys` provides a `VKey` and `ModKey` enum that abstracts the Windows Virtual Key (VK) codes. These keys
+`win-hotkeys` provides `VKey` and `ModKey` enums that abstract the Windows Virtual Key (VK) codes. These keys
 are used to specify the hotkeys available for registration.
 
 ```rust
