@@ -13,7 +13,7 @@ bypasses limitations of RegisterHotKey.
 
 ```toml
 [dependencies]
-win-hotkeys = "0.1.0"
+win-hotkeys = "0.2.0"
 ```
 
 ## Usage
