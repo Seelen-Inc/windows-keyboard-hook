@@ -8,7 +8,7 @@ The `win-hotkeys` crate simplifies working with the Windows API by abstracting a
 all interactions related to registering hotkeys and handling their events. Unlike many other 
 solutions, this crate does not rely on the `RegisterHotKey` Windows function. Instead, it 
 leverages a `WH_KEYBOARD_LL` hook to provide a more flexible and powerful way to monitor 
-global hotkeys. This approach, allows for additional functionality (i.e. WIN key as modifier) and 
+global hotkeys. This approach allows for additional functionality (i.e. `WIN` key as modifier) and 
 bypasses limitations of RegisterHotKey.
 
 ```toml
