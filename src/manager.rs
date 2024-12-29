@@ -5,7 +5,7 @@
 use crate::error::WHKError;
 use crate::error::WHKError::RegistrationFailed;
 use crate::hook;
-use crate::hook::KeyboardEvent;
+use crate::hook::{KeyAction, KeyboardEvent};
 use crate::hotkey::Hotkey;
 use crate::keys::{ModKey, VKey};
 use crossbeam_channel::Sender;
@@ -105,7 +105,11 @@ impl<T> HotkeyManager<T> {
                 if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
                     for hotkey in hotkeys {
                         if hotkey.id == event_id {
-                            hook.block(true);
+                            if win {
+                                hook.key_action(KeyAction::Replace);
+                            } else {
+                                hook.key_action(KeyAction::Block);
+                            }
                             let result = (hotkey.callback)();
                             if let Some(callback_result_channel) = &self.callback_results_channel {
                                 callback_result_channel.send(result).unwrap();
@@ -116,7 +120,7 @@ impl<T> HotkeyManager<T> {
                     }
                 }
                 if !found {
-                    hook.block(false);
+                    hook.key_action(KeyAction::Allow);
                 }
             }
         }

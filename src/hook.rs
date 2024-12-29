@@ -15,8 +15,9 @@ use std::thread;
 use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU,
-    VK_RSHIFT, VK_RWIN, VK_SHIFT,
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+    VIRTUAL_KEY, VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL,
+    VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
@@ -29,14 +30,29 @@ const TIMEOUT: Duration = Duration::from_millis(100);
 
 /// Shared state for hook channels.
 pub static HOOK_CHANNELS: RwLock<
-    Option<(Sender<KeyboardEvent>, Receiver<bool>, Receiver<ControlFlow>)>,
+    Option<(
+        Sender<KeyboardEvent>,
+        Receiver<KeyAction>,
+        Receiver<ControlFlow>,
+    )>,
 > = RwLock::new(None);
+
+/// Unassigned Virtual Key code used to suppress Windows Key events
+const SILENT_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
 /// Atomic flags for tracking modifier key states.
 static CTRL: AtomicBool = AtomicBool::new(false);
 static SHIFT: AtomicBool = AtomicBool::new(false);
 static ALT: AtomicBool = AtomicBool::new(false);
 static WIN: AtomicBool = AtomicBool::new(false);
+
+/// Enum representing how to handle keypress
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum KeyAction {
+    Allow,
+    Block,
+    Replace,
+}
 
 /// Enum representing control flow signals for the hook thread.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -72,7 +88,7 @@ pub enum KeyboardEvent {
 /// Struct representing the keyboard hook interface
 pub struct KeyboardHook {
     ke_rx: Receiver<KeyboardEvent>,
-    block_tx: Sender<bool>,
+    action_tx: Sender<KeyAction>,
     cf_tx: Sender<ControlFlow>,
 }
 
@@ -83,8 +99,8 @@ impl KeyboardHook {
     }
 
     /// Blocks or unblocks the propagation of the next key event.
-    pub fn block(&self, value: bool) {
-        self.block_tx.send(value).unwrap();
+    pub fn key_action(&self, value: KeyAction) {
+        self.action_tx.send(value).unwrap();
     }
 
     /// Signals the hook thread to exit.
@@ -99,11 +115,11 @@ impl KeyboardHook {
 /// A `KeyboardHook` instance to interact with the hook (e.g., receiving events, blocking keys).
 pub fn start() -> KeyboardHook {
     let (ke_tx, ke_rx) = unbounded();
-    let (block_tx, block_rx) = unbounded();
+    let (action_tx, action_rx) = unbounded();
     let (cf_tx, cf_rx) = unbounded();
 
     let mut hook_channels = HOOK_CHANNELS.write().unwrap();
-    *hook_channels = Some((ke_tx, block_rx, cf_rx));
+    *hook_channels = Some((ke_tx, action_rx, cf_rx));
 
     unsafe {
         thread::spawn(|| {
@@ -134,7 +150,7 @@ pub fn start() -> KeyboardHook {
 
     KeyboardHook {
         ke_rx,
-        block_tx,
+        action_tx,
         cf_tx,
     }
 }
@@ -160,11 +176,15 @@ fn update_modifier_state(key: u16, state: bool) {
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 {
         let hook_channels = HOOK_CHANNELS.read().unwrap();
-        if let Some((ke_tx, block_rx, _)) = &*hook_channels {
+        if let Some((ke_tx, action_rx, _)) = &*hook_channels {
             let kbd_hook = lparam.0 as *const KBDLLHOOKSTRUCT;
             let key = (*kbd_hook).vkCode as u16;
             let event = wparam.0 as u32;
             let mut check_block = false;
+
+            if key == SILENT_KEY.0 {
+                return CallNextHookEx(None, code, wparam, lparam);
+            }
 
             match event {
                 WM_KEYDOWN | WM_SYSKEYDOWN => {
@@ -186,9 +206,42 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
                 _ => {}
             };
             if check_block {
-                if let Ok(block) = block_rx.recv_timeout(TIMEOUT) {
-                    if block {
-                        return LRESULT(1);
+                if let Ok(action) = action_rx.recv_timeout(TIMEOUT) {
+                    match action {
+                        KeyAction::Block => {
+                            return LRESULT(1);
+                        }
+                        KeyAction::Replace => {
+                            let inputs = [
+                                INPUT {
+                                    r#type: INPUT_KEYBOARD,
+                                    Anonymous: INPUT_0 {
+                                        ki: KEYBDINPUT {
+                                            wVk: SILENT_KEY,
+                                            wScan: 0,
+                                            dwFlags: KEYBD_EVENT_FLAGS(0),
+                                            time: 0,
+                                            dwExtraInfo: 0,
+                                        },
+                                    },
+                                },
+                                INPUT {
+                                    r#type: INPUT_KEYBOARD,
+                                    Anonymous: INPUT_0 {
+                                        ki: KEYBDINPUT {
+                                            wVk: SILENT_KEY,
+                                            wScan: 0,
+                                            dwFlags: KEYEVENTF_KEYUP,
+                                            time: 0,
+                                            dwExtraInfo: 0,
+                                        },
+                                    },
+                                },
+                            ];
+                            SendInput(&inputs, size_of::<INPUT>() as i32);
+                            return LRESULT(1);
+                        }
+                        KeyAction::Allow => {}
                     }
                 }
             }
