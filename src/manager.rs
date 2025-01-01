@@ -7,11 +7,13 @@ use crate::error::WHKError::RegistrationFailed;
 use crate::hook;
 use crate::hook::{KeyAction, KeyboardEvent};
 use crate::hotkey::Hotkey;
-use crate::keys::{ModKey, VKey};
 use crossbeam_channel::Sender;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use windows::Win32::UI::Input::KeyboardAndMouse::VK_LWIN;
+use crate::state::KeyboardState;
+use crate::keys::VKey;
 
 /// Manages the lifecycle of hotkeys, including their registration, unregistration, and execution.
 ///
@@ -39,21 +41,21 @@ impl<T> HotkeyManager<T> {
     }
 
     /// Registers a new hotkey.
-    pub fn register_hotkey(
-        &mut self,
-        trigger_key: VKey,
-        mod_keys: &[ModKey],
-        callback: impl Fn() -> T + Send + 'static,
-    ) -> Result<i32, WHKError> {
-        let hotkey = Hotkey::new(&trigger_key, mod_keys, callback);
-        let id = hotkey.id;
+    pub fn register_hotkey(&mut self, trigger_key: VKey, mod_keys: &[VKey], callback: impl Fn() -> T + Send + 'static) -> Result<i32, WHKError> {
+        let hotkey = Hotkey::new(trigger_key, mod_keys, callback);
+
+        // Check if already exists
+        let state = hotkey.generate_keyboard_state();
         if self
             .hotkeys
             .values()
-            .any(|vec| vec.iter().any(|hotkey| hotkey.id == id))
+            .any(|vec| vec.iter().any(|hotkey| hotkey.generate_keyboard_state() == state))
         {
             return Err(RegistrationFailed);
         }
+
+        // Add hotkey and return id
+        let id = hotkey.generate_id();
         let entry = self.hotkeys.entry(trigger_key.to_vk_code()).or_default();
         entry.push(hotkey);
         Ok(id)
@@ -62,7 +64,7 @@ impl<T> HotkeyManager<T> {
     /// Unregisters a hotkey by its unique id
     pub fn unregister_hotkey(&mut self, hotkey_id: i32) {
         for vec in self.hotkeys.values_mut() {
-            vec.retain(|hotkey| hotkey.id != hotkey_id);
+            vec.retain(|hotkey| hotkey.generate_id() != hotkey_id);
         }
     }
 
@@ -84,33 +86,24 @@ impl<T> HotkeyManager<T> {
         let hook = hook::start();
         while !self.interrupt.load(Ordering::Relaxed) {
             if let Ok(event) = hook.recv() {
-                let (key_code, ctrl, shift, alt, win) = match event {
+                let (key_code, state) = match event {
                     KeyboardEvent::KeyDown {
-                        key_code,
-                        ctrl,
-                        shift,
-                        alt,
-                        win,
-                    } => (key_code, ctrl, shift, alt, win),
+                        vk_code: key_code,
+                        keyboard_state: state,
+                    } => (key_code, state),
                     _ => continue,
                 };
-
-                let mut modifiers = ModKey::mod_mask_from_bool(ctrl, shift, alt, win);
-                if let Ok(mod_key) = ModKey::from_vk_code(key_code) {
-                    modifiers ^= mod_key.to_mod_bit();
-                }
-                let event_id = Hotkey::<T>::generate_hotkey_id(key_code, modifiers);
 
                 let mut found = false;
                 if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
                     for hotkey in hotkeys {
-                        if hotkey.id == event_id {
-                            if win {
+                        if hotkey.generate_keyboard_state() == state {
+                            if state.is_down(VK_LWIN.0) {
                                 hook.key_action(KeyAction::Replace);
                             } else {
                                 hook.key_action(KeyAction::Block);
                             }
-                            let result = (hotkey.callback)();
+                            let result = hotkey.callback();
                             if let Some(callback_result_channel) = &self.callback_results_channel {
                                 callback_result_channel.send(result).unwrap();
                             }
@@ -150,17 +143,14 @@ unsafe impl Send for InterruptHandle {}
 
 impl InterruptHandle {
     pub fn interrupt(&self) {
-        use crate::hook::{KeyboardEvent, HOOK_CHANNELS};
+        use crate::hook::{KeyboardEvent, HOOK_EVENT_TX};
         let dummy_event = KeyboardEvent::KeyDown {
-            key_code: 0,
-            ctrl: false,
-            shift: false,
-            alt: false,
-            win: false,
+            vk_code: 0,
+            keyboard_state: KeyboardState::new(),
         };
         self.interrupt_handle.store(true, Ordering::Relaxed);
-        let hook_channels = HOOK_CHANNELS.read().unwrap();
-        if let Some((ke_tx, _, _)) = &*hook_channels {
+        let event_tx = HOOK_EVENT_TX.read().unwrap();
+        if let Some(ke_tx) = &*event_tx {
             ke_tx.send(dummy_event).unwrap();
         }
     }

@@ -13,57 +13,41 @@ bypasses limitations of RegisterHotKey.
 
 ```toml
 [dependencies]
-win-hotkeys = "0.3.0"
+win-hotkeys = "0.4.0"
 ```
+
+## Features
+- **Thread Safe**: Built with safety in mind, ensuring reliable operation across multiple threads.
+- **Easy Hotkey Management**: Simple process of creating, registering, and managing hotkeys.
+- **Flexible Key Combinations**: Register any set of keys (single or multiple) as a hotkey.
+- **Rust Callbacks and Closures**: Assign Rust functions or closures to run when a hotkey is triggered.
+- **Human-Readable Key Names**: Create `VKey` instances from intuitive string representations.
+- **Efficient Performance**: Optimized to handle hotkey events with minimal overhead.
 
 ## Usage
 ```rust
-use win_hotkeys::keys::{ModKey, VKey};
+use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
 
 fn main() {
     let mut manager = HotkeyManager::new();
 
-    manager.register_hotkey(VKey::A, &[ModKey::Ctrl], || {
+    manager.register_hotkey(VKey::A, &[VKey::Control], || {
         println!("Hotkey CTRL + A was pressed");
     }).unwrap();
 
     hkm.event_loop();
 }
 ```
-## Keys
-`win-hotkeys` provides `VKey` and `ModKey` enums that abstract the Windows Virtual Key (VK) codes. These keys
+
+## Virtual Keys
+`win-hotkeys` provides a `VKey` enum that abstracts the Windows Virtual-Key (VK) codes. These keys
 are used to specify the hotkeys available for registration.
 
-```rust
-fn main() {
-    let vk_a1 = VKey::A;
-    let vk_a2 = VKey::from_keyname("a").unwrap();
-    let vk_a3 = VKey::from_keyname("A").unwrap();
-    let vk_a4 = VKey::from_keyname("0x41").unwrap();
-    let vk_a5 = VKey::from_vk_code(0x41);
-    let vk_a6 = VKey::CustomKeyCode(0x41);
+For a full list of supported key names and codes, refer to the [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
 
-    assert_eq!(vk_a1, vk_a2);
-    assert_eq!(vk_a1, vk_a3);
-    assert_eq!(vk_a1, vk_a4);
-    assert_eq!(vk_a1, vk_a5);
-    assert_eq!(vk_a1, vk_a6);
-
-    let mod_alt1 = ModKey::Alt;
-    let mod_alt2 = ModKey::from_keyname("alt").unwrap();
-    let mod_alt3 = ModKey::from_keyname("VK_LMENU").unwrap();
-    let mod_alt4 = ModKey::from_keyname("OxA4").unwrap();
-    let mod_alt5 = ModKey::from_vk_code(0xA4).unwrap();
-
-    assert_eq!(mod_alt1, mod_alt2);
-    assert_eq!(mod_alt1, mod_alt3);
-    assert_eq!(mod_alt1, mod_alt4);
-    assert_eq!(mod_alt1, mod_alt5);
-}
-```
-
-For a full list of supported keys, refer to the [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
+Additionally, the key names `Ctrl`, `Win`, and `Alt` can be used to specify the `VK_CONTROL`, `VK_LWIN`, `VK_MENU`
+keys when creating a `VKey` from key name.
 
 ## Examples
 Up-to-date examples can always be found in the [examples directory](https://github.com/iholston/win-hotkeys/tree/main/examples)

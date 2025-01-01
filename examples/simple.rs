@@ -1,4 +1,4 @@
-use win_hotkeys::keys::{ModKey, VKey};
+use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
 
 fn main() {
@@ -6,28 +6,25 @@ fn main() {
 
     // Register a system-wide hotkey with the trigger key 'A' and the modifier key 'ALT'
     manager
-        .register_hotkey(VKey::A, &[ModKey::Alt], || {
+        .register_hotkey(VKey::A, &[VKey::from_keyname("alt").unwrap()], || {
             println!("Hotkey ALT + A was pressed");
         })
         .unwrap();
 
-    // Register a system-wide hotkey with the trigger key 'B' and multiple modifier keys
+    // Register a system-wide hotkey with the trigger key 'B' and the modifier key 'f24'
     let trigger_key = VKey::from_keyname("b").unwrap();
-    let modifiers = &[
-        ModKey::from_keyname("CTRL").unwrap(),
-        ModKey::from_keyname("SHIFT").unwrap(),
-    ];
+    let modifiers = &[VKey::from_vk_code(0x87)];
     manager
         .register_hotkey(trigger_key, modifiers, || {
-            println!("Hotkey CTRL + SHIFT + B was pressed");
+            println!("Hotkey F24 + B was pressed");
         })
         .unwrap();
 
-    // Register a system-wide hotkey with the trigger key 'C' and multiple modifier keys
+    // Register a system-wide hotkey with the trigger key 'C' and multiple modifier key
     manager
         .register_hotkey(
             VKey::CustomKeyCode(0x43),
-            &[ModKey::Win, ModKey::Alt],
+            &[VKey::LWin, VKey::Menu],
             || {
                 println!("Hotkey WIN + ALT + C was pressed");
             },
@@ -38,7 +35,7 @@ fn main() {
     let hotkey_id = manager
         .register_hotkey(
             VKey::from_vk_code(0x44),
-            &[ModKey::from_vk_code(0xA4).unwrap()],
+            &[VKey::from_vk_code(0xA4)],
             || {
                 println!("Hotkey ALT + D was pressed");
             },
