@@ -7,13 +7,13 @@ use crate::error::WHKError::RegistrationFailed;
 use crate::hook;
 use crate::hook::{KeyAction, KeyboardEvent};
 use crate::hotkey::Hotkey;
+use crate::keys::VKey;
+use crate::state::KeyboardState;
 use crossbeam_channel::Sender;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use windows::Win32::UI::Input::KeyboardAndMouse::VK_LWIN;
-use crate::state::KeyboardState;
-use crate::keys::VKey;
 
 /// Manages the lifecycle of hotkeys, including their registration, unregistration, and execution.
 ///
@@ -41,16 +41,20 @@ impl<T> HotkeyManager<T> {
     }
 
     /// Registers a new hotkey.
-    pub fn register_hotkey(&mut self, trigger_key: VKey, mod_keys: &[VKey], callback: impl Fn() -> T + Send + 'static) -> Result<i32, WHKError> {
+    pub fn register_hotkey(
+        &mut self,
+        trigger_key: VKey,
+        mod_keys: &[VKey],
+        callback: impl Fn() -> T + Send + 'static,
+    ) -> Result<i32, WHKError> {
         let hotkey = Hotkey::new(trigger_key, mod_keys, callback);
 
         // Check if already exists
         let state = hotkey.generate_keyboard_state();
-        if self
-            .hotkeys
-            .values()
-            .any(|vec| vec.iter().any(|hotkey| hotkey.generate_keyboard_state() == state))
-        {
+        if self.hotkeys.values().any(|vec| {
+            vec.iter()
+                .any(|hotkey| hotkey.generate_keyboard_state() == state)
+        }) {
             return Err(RegistrationFailed);
         }
 

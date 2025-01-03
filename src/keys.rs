@@ -520,7 +520,7 @@ impl VKey {
                 Ok(Self::from_vk_code(val))
             } else {
                 Err(WHKError::InvalidKey(name))
-            }
+            };
         }
 
         Ok(match name.trim_start_matches("VK_") {

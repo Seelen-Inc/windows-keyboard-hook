@@ -2,10 +2,10 @@
 //! Hotkeys consist of a trigger key, modifiers, and an optional blocking behavior.
 //! A callback function is executed when the hotkey is triggered.
 
+use crate::keys::VKey;
+use crate::state::KeyboardState;
 use std::fmt;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use crate::state::KeyboardState;
-use crate::keys::VKey;
 
 /// Represents a keyboard hotkey.
 pub struct Hotkey<T> {
@@ -15,7 +15,11 @@ pub struct Hotkey<T> {
 }
 
 impl<T> Hotkey<T> {
-    pub fn new(trigger_key: VKey, modifiers: &[VKey], callback: impl Fn() -> T + Send + 'static) -> Hotkey<T> {
+    pub fn new(
+        trigger_key: VKey,
+        modifiers: &[VKey],
+        callback: impl Fn() -> T + Send + 'static,
+    ) -> Hotkey<T> {
         Self {
             trigger_key,
             modifiers: modifiers.to_vec(),

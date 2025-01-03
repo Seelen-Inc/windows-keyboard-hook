@@ -8,6 +8,7 @@
 //! - Sends `KeyboardEvent` objects for key down and key up events.
 //! - Supports blocking or propagating key events based on user-defined logic.
 
+use crate::state::KeyboardState;
 use crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use std::sync::{Mutex, OnceLock, RwLock};
 use std::thread;
@@ -15,14 +16,13 @@ use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
-    VIRTUAL_KEY
+    VIRTUAL_KEY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
     UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
     WM_SYSKEYUP,
 };
-use crate::state::KeyboardState;
 
 /// Timeout for blocking key events, measured in milliseconds.
 const TIMEOUT: Duration = Duration::from_millis(100);
@@ -63,13 +63,13 @@ pub enum KeyboardEvent {
         /// The virtual key code of the key.
         vk_code: u16,
         /// The updated keyboard state due to this event.
-        keyboard_state: KeyboardState
+        keyboard_state: KeyboardState,
     },
     KeyUp {
         /// The virtual key code of the key.
         key_code: u16,
         /// The updated keyboard state due to this event.
-        keyboard_state: KeyboardState
+        keyboard_state: KeyboardState,
     },
 }
 
