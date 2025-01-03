@@ -40,7 +40,7 @@ fn main() {
         _ => {}
     }
 
-    hkm.register_hotkey(vk_a1, &[], || {
+    hkm.register_hotkey(vk_a5, &[], || {
         println!("You pressed A");
     })
     .unwrap();
