@@ -24,8 +24,8 @@ win-hotkeys = "0.4.0"
 
 ## Usage
 ```rust
-use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 
 fn main() {
     let mut hkm = HotkeyManager::new();
@@ -63,12 +63,32 @@ as a modifier**. For example, using `Shift` as a modifier will trigger the hotke
 present on most keyboards).
 
 ```rust
-let key1 = VKey::from_keyname("VK_MENU").unwrap(); // Official name
-let key2 = VKey::from_keyname("alt").unwrap();     // Alias for VK_MENU
-let key3 = VKey::from_keyname("MENU").unwrap();    // Omitted VK_
+use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 
-assert_eq!(key1, key2);
-assert_eq!(key1, key3);
+fn main() {
+    let mut hkm = HotkeyManager::new();
+
+    let key1 = VKey::from_keyname("VK_MENU").unwrap(); // Official name
+    let key2 = VKey::from_keyname("alt").unwrap(); // Alias for VK_MENU
+    let key3 = VKey::from_keyname("MENU").unwrap(); // Omitted VK_
+
+    assert_eq!(key1, key2);
+    assert_eq!(key1, key3);
+
+    hkm.register_hotkey(VKey::A, &[key1, VKey::Shift], || {
+        println!("Hotkey ALT + SHIFT (LSHIFT or RSHIFT) + A was pressed");
+    })
+        .unwrap();
+
+    hkm.register_hotkey(VKey::B, &[VKey::LShift], || {
+        println!("Hotkey LSHIFT + B was pressed"); // will not trigger on RSHIFT + B
+    })
+        .unwrap();
+
+    hkm.event_loop();
+}
+
 ```
 
 ## Examples
