@@ -1,3 +1,5 @@
+//! manager.rs
+//!
 //! Defines the `HotkeyManager`, which manages the registration,
 //! unregistration, and execution of hotkeys. It also handles the main event
 //! loop that listens for keyboard events and invokes associated callbacks.
@@ -7,8 +9,8 @@ use crate::error::WHKError::RegistrationFailed;
 use crate::hook;
 use crate::hook::{KeyAction, KeyboardEvent};
 use crate::hotkey::Hotkey;
+use crate::keyboard::KeyboardState;
 use crate::keys::VKey;
-use crate::state::KeyboardState;
 use crossbeam_channel::Sender;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -18,7 +20,10 @@ use windows::Win32::UI::Input::KeyboardAndMouse::VK_LWIN;
 /// Manages the lifecycle of hotkeys, including their registration, unregistration, and execution.
 ///
 /// The `HotkeyManager` listens for keyboard events and triggers the corresponding
-/// hotkey callbacks when events match registered hotkeys.
+/// hotkey callbacks when events match registered
+/// hotkeys.
+/// # Type Parameters
+/// - `T`: The return type of the hotkey callbacks.
 pub struct HotkeyManager<T> {
     hotkeys: HashMap<u16, Vec<Hotkey<T>>>,
     interrupt: Arc<AtomicBool>,
@@ -146,6 +151,10 @@ unsafe impl Sync for InterruptHandle {}
 unsafe impl Send for InterruptHandle {}
 
 impl InterruptHandle {
+    /// Interrupts the `HotkeyManager`'s event loop.
+    ///
+    /// This method sets an internal flag to indicate that the interruption has been requested.
+    /// then sends a dummy keyboard event to the event loop to force it to check the flag.
     pub fn interrupt(&self) {
         use crate::hook::{KeyboardEvent, HOOK_EVENT_TX};
         let dummy_event = KeyboardEvent::KeyDown {

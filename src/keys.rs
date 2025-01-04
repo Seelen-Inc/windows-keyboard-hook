@@ -3,14 +3,6 @@ use std::hash::Hash;
 
 /// Represents a virtual key (VK) code.
 ///
-/// # Variants
-/// - Standard keys like `Back`, `Tab`, `Return`, etc.
-/// - Numpad keys such as `Numpad0` through `Numpad9`.
-/// - Function keys from `F1` to `F24`.
-/// - Modifier keys: `Shift`, `Control`, etc.
-/// - Browser and media keys: `BrowserBack`, `VolumeMute`, etc.
-/// - Custom keys represented by `CustomKeyCode(u16)`.
-///
 /// # See Also
 /// - [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
 ///
@@ -502,7 +494,7 @@ impl VKey {
 
     /// Creates a `VKey` from a string representation of the key.
     ///
-    /// NOTE: Certain common names for keys are accepted in addition to the Microsoft Virtual-Key Codes names
+    /// NOTE: Certain common aliases for keys are accepted in addition to the Microsoft Virtual-Key Codes names
     ///
     /// WIN maps to `VKey::LWin`
     /// CTRL maps to `VKey::Control`

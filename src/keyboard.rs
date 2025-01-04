@@ -1,3 +1,9 @@
+//! keyboard.rs
+//!
+//! This module provides the `KeyboardState` struct to track the state of keyboard keys.
+//! It supports key press (`keydown`), key release (`keyup`), and querying key state (`is_down`).
+//! Additionally, it normalizes certain keys (e.g., treating left and right control as the same key).
+
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU,
     VK_RSHIFT, VK_RWIN, VK_SHIFT,
@@ -8,11 +14,17 @@ pub struct KeyboardState {
     flags: [u128; 2],
 }
 
+/// Represents the state of keyboard keys.
+///
+/// Tracks which keys are currently pressed using two 128-bit flags, allowing
+/// support for 256 keys.
 impl KeyboardState {
+    /// Creates a new `KeyboardState` with all keys released.
     pub fn new() -> KeyboardState {
         KeyboardState { flags: [0, 0] }
     }
 
+    /// Marks a key as pressed.
     pub fn keydown(&mut self, mut key: u16) {
         key = KeyboardState::normalize_key(key);
         let index = (key / 128) as usize;
@@ -20,6 +32,7 @@ impl KeyboardState {
         self.flags[index] |= 1 << position;
     }
 
+    /// Marks a key as released.
     pub fn keyup(&mut self, mut key: u16) {
         key = KeyboardState::normalize_key(key);
         let index = (key / 128) as usize;
@@ -27,6 +40,7 @@ impl KeyboardState {
         self.flags[index] &= !(1 << position);
     }
 
+    /// Checks if a key is currently pressed.
     pub fn is_down(&self, mut key: u16) -> bool {
         key = KeyboardState::normalize_key(key);
         let index = (key / 128) as usize;
@@ -34,10 +48,14 @@ impl KeyboardState {
         (self.flags[index] & (1 << position)) != 0
     }
 
+    /// Clears the state of all keys, marking them as released.
     pub fn clear(&mut self) {
         self.flags = [0, 0];
     }
 
+    /// Normalizes the virtual key code to handle keys that should be treated as the same.
+    ///
+    /// For example, `VK_CONTROL` and `VK_RCONTROL` are normalized to `VK_LCONTROL`.
     fn normalize_key(key: u16) -> u16 {
         match key {
             _ if key == VK_CONTROL.0 => VK_LCONTROL.0,

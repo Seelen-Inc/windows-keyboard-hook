@@ -1,14 +1,11 @@
+//! hook.rs
+//!
 //! Provides a low-level implementation of a keyboard hook
 //! using the Windows API. It captures keyboard events such as key presses
 //! and releases, tracks the state of modifier keys, and communicates events
 //! via channels to the rest of the application.
-//!
-//! ## Features
-//! - Tracks modifier keys (`Ctrl`, `Shift`, `Alt`, `Win`) using atomic flags.
-//! - Sends `KeyboardEvent` objects for key down and key up events.
-//! - Supports blocking or propagating key events based on user-defined logic.
 
-use crate::state::KeyboardState;
+use crate::keyboard::KeyboardState;
 use crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use std::sync::{Mutex, OnceLock, RwLock};
 use std::thread;
@@ -27,22 +24,22 @@ use windows::Win32::UI::WindowsAndMessaging::{
 /// Timeout for blocking key events, measured in milliseconds.
 const TIMEOUT: Duration = Duration::from_millis(100);
 
-/// Unassigned Virtual Key code used to suppress Windows Key events
+/// Unassigned Virtual Key code used to suppress Windows Key events.
 const SILENT_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
-/// Channel sender used by hook proc to send keyboard events
+/// Channel sender used by hook proc to send keyboard events.
 pub static HOOK_EVENT_TX: RwLock<Option<Sender<KeyboardEvent>>> = RwLock::new(None);
 
-/// Channel receiver used to notify the hook on how to handle keyboard events
+/// Channel receiver used to notify the hook on how to handle keyboard events.
 static HOOK_RESPONSE_RX: RwLock<Option<Receiver<KeyAction>>> = RwLock::new(None);
 
-/// Channel receiver used to notify hook proc to exit
+/// Channel receiver used to notify hook proc to exit.
 static HOOK_CONTROL_RX: RwLock<Option<Receiver<ControlFlow>>> = RwLock::new(None);
 
-/// Bitmask object representing all pressed keys on keyboard
+/// Bitmask object representing all pressed keys on keyboard.
 static KEYBOARD_STATE: OnceLock<Mutex<KeyboardState>> = OnceLock::new();
 
-/// Enum representing how to handle keypress
+/// Enum representing how to handle keypress.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum KeyAction {
     Allow,
@@ -168,7 +165,7 @@ fn update_keyboard_state(vk_code: u16, keydown: bool) {
     }
 }
 
-/// Sends a keydown and keyup event for Unassigned Virtual Key 0xE8
+/// Sends a keydown and keyup event for Unassigned Virtual Key 0xE8.
 unsafe fn send_silent_key() {
     let inputs = [
         INPUT {
