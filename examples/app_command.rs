@@ -1,7 +1,7 @@
 use crossbeam_channel::unbounded;
 use std::thread;
-use win_hotkeys::keys::{ModKey, VKey};
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 
 enum AppCommand {
     AppCommand1,
@@ -12,7 +12,7 @@ enum AppCommand {
 fn main() {
     // The HotkeyManager is generic over the return type of the callback functions.
     let mut hkm = HotkeyManager::new();
-    let modifiers = &[ModKey::Win, ModKey::Shift];
+    let modifiers = &[VKey::LWin, VKey::Shift];
 
     // Register WIN + SHIFT + 1 for app command 1
     hkm.register_hotkey(VKey::Vk1, modifiers, || {

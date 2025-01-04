@@ -1,5 +1,5 @@
-use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 use windows::Win32::UI::Input::KeyboardAndMouse::VK_A;
 
 fn main() {
@@ -40,7 +40,7 @@ fn main() {
         _ => {}
     }
 
-    hkm.register_hotkey(vk_a1, &[], || {
+    hkm.register_hotkey(vk_a5, &[], || {
         println!("You pressed A");
     })
     .unwrap();

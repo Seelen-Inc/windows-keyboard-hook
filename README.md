@@ -4,66 +4,92 @@
 [![Documentation](https://docs.rs/win-hotkeys/badge.svg)](https://docs.rs/win-hotkeys)
 > A lightweight, thread-safe Rust library for managing system-wide hotkeys on Windows
 
-The `win-hotkeys` crate simplifies working with the Windows API by abstracting and managing 
-all interactions related to registering hotkeys and handling their events. Unlike many other 
-solutions, this crate does not rely on the `RegisterHotKey` Windows function. Instead, it 
-leverages a `WH_KEYBOARD_LL` hook to provide a more flexible and powerful way to monitor 
-global hotkeys. This approach allows for additional functionality (i.e. `WIN` key as modifier) and 
-bypasses limitations of RegisterHotKey.
+The `win-hotkeys` crate simplifies hotkey management on Windows by abstracting interactions 
+with the Windows API. It leverages the `WH_KEYBOARD_LL` low-level keyboard hook to provide a 
+robust and flexible solution for global hotkeys, including full support for the `WIN` key as a 
+modifier.
 
 ```toml
 [dependencies]
-win-hotkeys = "0.3.0"
+win-hotkeys = "0.4.0"
 ```
+
+## Features
+- **Thread Safe**: Built with safety in mind, ensuring reliable operation across multiple threads.
+- **Easy Hotkey Management**: Simple process of creating, registering, and managing hotkeys.
+- **Flexible Key Combinations**: Register any set of keys (single or multiple) as a hotkey including the `WIN` key.
+- **Rust Callbacks and Closures**: Assign Rust functions or closures to run when a hotkey is triggered.
+- **Human-Readable Key Names**: Create `VKey` instances from intuitive string representations.
+- **Efficient Performance**: Optimized to handle hotkey events with minimal overhead.
 
 ## Usage
 ```rust
-use win_hotkeys::keys::{ModKey, VKey};
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 
 fn main() {
-    let mut manager = HotkeyManager::new();
+    let mut hkm = HotkeyManager::new();
 
-    manager.register_hotkey(VKey::A, &[ModKey::Ctrl], || {
+    hkm.register_hotkey(VKey::A, &[VKey::from_keyname("ctrl").unwrap()], || {
         println!("Hotkey CTRL + A was pressed");
+    }).unwrap();
+
+    hkm.register_hotkey(VKey::B, &[VKey::LWin, VKey::Shift], || {
+        println!("Hotkey WIN + SHIFT + B was pressed");
     }).unwrap();
 
     hkm.event_loop();
 }
 ```
-## Keys
-`win-hotkeys` provides `VKey` and `ModKey` enums that abstract the Windows Virtual Key (VK) codes. These keys
-are used to specify the hotkeys available for registration.
+
+## Virtual Keys 
+The `VKey` enum in this library is based on the [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes), which define
+key codes for a wide range of keyboard keys. This provides a comprehensive and standardized set of keys
+that can be used to define hotkeys.
+
+A small list of **common alias names** are also supported:
+
+- `Ctrl`: `Control`(`VK_CONTROL`)
+- `LCtrl` : `LControl`(`VK_LCONTROL`)
+- `RCtrl`: `RControl`(`VK_RCONTROL`)
+- `Alt`:  `Menu`(`VK_MENU`)
+- `LAlt`: `LMenu`(`VK_LMENU`)
+- `RAlt`: `RMenu`(`VK_RMENU`)
+- `Win`: `LWin`(`VK_LWIN`)
+
+For keys that have distinct left and right versions, the default key will work with either key **when used 
+as a modifier**. For example, using `Shift` as a modifier will trigger the hotkey when either `LShift` or 
+`RShift` is pressed, but if used as a trigger key it will only respond if `Shift` is pressed (which is not
+present on most keyboards).
 
 ```rust
+use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
+
 fn main() {
-    let vk_a1 = VKey::A;
-    let vk_a2 = VKey::from_keyname("a").unwrap();
-    let vk_a3 = VKey::from_keyname("A").unwrap();
-    let vk_a4 = VKey::from_keyname("0x41").unwrap();
-    let vk_a5 = VKey::from_vk_code(0x41);
-    let vk_a6 = VKey::CustomKeyCode(0x41);
+    let mut hkm = HotkeyManager::new();
 
-    assert_eq!(vk_a1, vk_a2);
-    assert_eq!(vk_a1, vk_a3);
-    assert_eq!(vk_a1, vk_a4);
-    assert_eq!(vk_a1, vk_a5);
-    assert_eq!(vk_a1, vk_a6);
+    let key1 = VKey::from_keyname("VK_MENU").unwrap(); // Official name
+    let key2 = VKey::from_keyname("alt").unwrap();     // Alias for VK_MENU
+    let key3 = VKey::from_keyname("MENU").unwrap();    // Omitted VK_
 
-    let mod_alt1 = ModKey::Alt;
-    let mod_alt2 = ModKey::from_keyname("alt").unwrap();
-    let mod_alt3 = ModKey::from_keyname("VK_LMENU").unwrap();
-    let mod_alt4 = ModKey::from_keyname("OxA4").unwrap();
-    let mod_alt5 = ModKey::from_vk_code(0xA4).unwrap();
+    assert_eq!(key1, key2);
+    assert_eq!(key1, key3);
 
-    assert_eq!(mod_alt1, mod_alt2);
-    assert_eq!(mod_alt1, mod_alt3);
-    assert_eq!(mod_alt1, mod_alt4);
-    assert_eq!(mod_alt1, mod_alt5);
+    hkm.register_hotkey(VKey::A, &[key1, VKey::Shift], || {
+        println!("Hotkey ALT + SHIFT (LSHIFT or RSHIFT) + A was pressed");
+    })
+        .unwrap();
+
+    hkm.register_hotkey(VKey::B, &[VKey::LShift], || {
+        println!("Hotkey LSHIFT + B was pressed"); // will not trigger on RSHIFT + B
+    })
+        .unwrap();
+
+    hkm.event_loop();
 }
-```
 
-For a full list of supported keys, refer to the [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
+```
 
 ## Examples
 Up-to-date examples can always be found in the [examples directory](https://github.com/iholston/win-hotkeys/tree/main/examples)

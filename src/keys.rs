@@ -1,16 +1,7 @@
 use crate::error::WHKError;
-use crate::keys::ModKey;
 use std::hash::Hash;
 
 /// Represents a virtual key (VK) code.
-///
-/// # Variants
-/// - Standard keys like `Back`, `Tab`, `Return`, etc.
-/// - Numpad keys such as `Numpad0` through `Numpad9`.
-/// - Function keys from `F1` to `F24`.
-/// - Modifier keys: `LShift`, `RShift`, `LControl`, `RControl`, etc.
-/// - Browser and media keys: `BrowserBack`, `VolumeMute`, etc.
-/// - Custom keys represented by `CustomKeyCode(u16)`.
 ///
 /// # See Also
 /// - [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
@@ -173,7 +164,7 @@ pub enum VKey {
 }
 
 impl VKey {
-    /// Converts a `VKey` to its corresponding Windows virtual key (VK) code.
+    /// Converts a `VKey` to its corresponding Windows Virtual-Key (VK) code.
     ///
     /// # See Also
     /// - [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
@@ -337,6 +328,11 @@ impl VKey {
         }
     }
 
+    /// Returns a `VKey` based a Windows Virtual-Key (VK) code.
+    ///
+    /// # See Also
+    /// - [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
+    ///
     pub const fn from_vk_code(vk_code: u16) -> VKey {
         use windows::Win32::UI::Input::KeyboardAndMouse::*;
         match vk_code {
@@ -498,16 +494,25 @@ impl VKey {
 
     /// Creates a `VKey` from a string representation of the key.
     ///
+    /// NOTE: Certain common aliases for keys are accepted in addition to the Microsoft Virtual-Key Codes names
+    ///
+    /// WIN maps to `VKey::LWin`
+    /// CTRL maps to `VKey::Control`
+    /// ALT maps to `VKey::Menu`
+    ///
+    /// # See Also
+    /// - [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
+    ///
     pub fn from_keyname(name: &str) -> Result<VKey, WHKError> {
         let name = name.to_ascii_uppercase();
 
         // 1 byte hex code => Use the raw keycode value
         if name.len() >= 3 && name.len() <= 6 && name.starts_with("0x") || name.starts_with("0X") {
-            if let Ok(val) = u16::from_str_radix(&name[2..], 16) {
-                return Ok(Self::CustomKeyCode(val));
+            return if let Ok(val) = u16::from_str_radix(&name[2..], 16) {
+                Ok(Self::from_vk_code(val))
             } else {
-                return Err(WHKError::InvalidKey(name));
-            }
+                Err(WHKError::InvalidKey(name))
+            };
         }
 
         Ok(match name.trim_start_matches("VK_") {
@@ -516,7 +521,9 @@ impl VKey {
             "CLEAR" => VKey::Clear,
             "RETURN" => VKey::Return,
             "SHIFT" => VKey::Shift,
+            "CTRL" => VKey::Control,
             "CONTROL" => VKey::Control,
+            "ALT" => VKey::Menu,
             "MENU" => VKey::Menu,
             "PAUSE" => VKey::Pause,
             "CAPITAL" => VKey::Capital,
@@ -537,6 +544,7 @@ impl VKey {
             "INSERT" => VKey::Insert,
             "DELETE" => VKey::Delete,
             "HELP" => VKey::Help,
+            "WIN" => VKey::LWin,
             "LWIN" => VKey::LWin,
             "RWIN" => VKey::RWin,
             "APPS" => VKey::Apps,
@@ -585,9 +593,13 @@ impl VKey {
             "SCROLL" => VKey::Scroll,
             "LSHIFT" => VKey::LShift,
             "RSHIFT" => VKey::RShift,
+            "LCTRL" => VKey::LControl,
             "LCONTROL" => VKey::LControl,
+            "RCTRL" => VKey::RControl,
             "RCONTROL" => VKey::RControl,
+            "LALT" => VKey::LMenu,
             "LMENU" => VKey::LMenu,
+            "RALT" => VKey::RMenu,
             "RMENU" => VKey::RMenu,
             "BROWSER_BACK" => VKey::BrowserBack,
             "BROWSER_FORWARD" => VKey::BrowserForward,
@@ -829,26 +841,6 @@ impl std::fmt::Display for VKey {
     }
 }
 
-impl TryInto<ModKey> for VKey {
-    type Error = ();
-    fn try_into(self) -> Result<ModKey, Self::Error> {
-        Ok(match self {
-            VKey::Control => ModKey::Ctrl,
-            VKey::LControl => ModKey::Ctrl,
-            VKey::RControl => ModKey::Ctrl,
-            VKey::Shift => ModKey::Shift,
-            VKey::LShift => ModKey::Shift,
-            VKey::RShift => ModKey::Shift,
-            VKey::Menu => ModKey::Alt,
-            VKey::LMenu => ModKey::Alt,
-            VKey::RMenu => ModKey::Alt,
-            VKey::LWin => ModKey::Win,
-            VKey::RWin => ModKey::Win,
-            _ => return Err(()),
-        })
-    }
-}
-
 impl std::str::FromStr for VKey {
     type Err = WHKError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -893,27 +885,6 @@ mod tests {
             VKey::CustomKeyCode(0x29)
         );
         assert!(VKey::from_keyname("INVALID_KEY").is_err());
-    }
-
-    #[test]
-    fn test_try_into_modkey() {
-        assert_eq!(
-            TryInto::<ModKey>::try_into(VKey::Control).unwrap(),
-            ModKey::Ctrl
-        );
-        assert_eq!(
-            TryInto::<ModKey>::try_into(VKey::LShift).unwrap(),
-            ModKey::Shift
-        );
-        assert_eq!(
-            TryInto::<ModKey>::try_into(VKey::Menu).unwrap(),
-            ModKey::Alt
-        );
-        assert_eq!(
-            TryInto::<ModKey>::try_into(VKey::RWin).unwrap(),
-            ModKey::Win
-        );
-        assert!(TryInto::<ModKey>::try_into(VKey::Return).is_err()); // Non-modifier key
     }
 
     #[test]
