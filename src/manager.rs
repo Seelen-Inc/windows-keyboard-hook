@@ -1,5 +1,3 @@
-//! manager.rs
-//!
 //! Defines the `HotkeyManager`, which manages the registration,
 //! unregistration, and execution of hotkeys. It also handles the main event
 //! loop that listens for keyboard events and invokes associated callbacks.

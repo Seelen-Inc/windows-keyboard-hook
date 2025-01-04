@@ -1,5 +1,3 @@
-//! hook.rs
-//!
 //! Provides a low-level implementation of a keyboard hook
 //! using the Windows API. It captures keyboard events such as key presses
 //! and releases, tracks the state of modifier keys, and communicates events

@@ -1,8 +1,5 @@
-//! keyboard.rs
-//!
 //! This module provides the `KeyboardState` struct to track the state of keyboard keys.
 //! It supports key press (`keydown`), key release (`keyup`), and querying key state (`is_down`).
-//! Additionally, it normalizes certain keys (e.g., treating left and right control as the same key).
 
 use crate::VKey;
 

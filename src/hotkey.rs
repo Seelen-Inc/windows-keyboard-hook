@@ -1,5 +1,3 @@
-//! hotkey.rs
-//!
 //! This module defines the `Hotkey` struct, which represents a keyboard hotkey.
 //! A hotkey is composed of a trigger key, one or more modifier keys, and a callback function
 //! that is executed when the hotkey is triggered.
