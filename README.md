@@ -70,8 +70,8 @@ fn main() {
     let mut hkm = HotkeyManager::new();
 
     let key1 = VKey::from_keyname("VK_MENU").unwrap(); // Official name
-    let key2 = VKey::from_keyname("alt").unwrap(); // Alias for VK_MENU
-    let key3 = VKey::from_keyname("MENU").unwrap(); // Omitted VK_
+    let key2 = VKey::from_keyname("alt").unwrap();     // Alias for VK_MENU
+    let key3 = VKey::from_keyname("MENU").unwrap();    // Omitted VK_
 
     assert_eq!(key1, key2);
     assert_eq!(key1, key3);
