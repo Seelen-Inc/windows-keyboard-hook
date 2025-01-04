@@ -4,10 +4,7 @@
 //! It supports key press (`keydown`), key release (`keyup`), and querying key state (`is_down`).
 //! Additionally, it normalizes certain keys (e.g., treating left and right control as the same key).
 
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU,
-    VK_RSHIFT, VK_RWIN, VK_SHIFT,
-};
+use crate::keys::VKey;
 
 #[derive(Debug, Copy, Clone)]
 pub struct KeyboardState {
@@ -25,24 +22,21 @@ impl KeyboardState {
     }
 
     /// Marks a key as pressed.
-    pub fn keydown(&mut self, mut key: u16) {
-        key = KeyboardState::normalize_key(key);
+    pub fn keydown(&mut self, key: u16) {
         let index = (key / 128) as usize;
         let position = key % 128;
         self.flags[index] |= 1 << position;
     }
 
     /// Marks a key as released.
-    pub fn keyup(&mut self, mut key: u16) {
-        key = KeyboardState::normalize_key(key);
+    pub fn keyup(&mut self, key: u16) {
         let index = (key / 128) as usize;
         let position = key % 128;
         self.flags[index] &= !(1 << position);
     }
 
     /// Checks if a key is currently pressed.
-    pub fn is_down(&self, mut key: u16) -> bool {
-        key = KeyboardState::normalize_key(key);
+    pub fn is_down(&self, key: u16) -> bool {
         let index = (key / 128) as usize;
         let position = key % 128;
         (self.flags[index] & (1 << position)) != 0
@@ -53,23 +47,39 @@ impl KeyboardState {
         self.flags = [0, 0];
     }
 
-    /// Normalizes the virtual key code to handle keys that should be treated as the same.
-    ///
-    /// For example, `VK_CONTROL` and `VK_RCONTROL` are normalized to `VK_LCONTROL`.
-    fn normalize_key(key: u16) -> u16 {
-        match key {
-            _ if key == VK_CONTROL.0 => VK_LCONTROL.0,
-            _ if key == VK_LCONTROL.0 => VK_LCONTROL.0,
-            _ if key == VK_RCONTROL.0 => VK_LCONTROL.0,
-            _ if key == VK_SHIFT.0 => VK_LSHIFT.0,
-            _ if key == VK_LSHIFT.0 => VK_LSHIFT.0,
-            _ if key == VK_RSHIFT.0 => VK_LSHIFT.0,
-            _ if key == VK_MENU.0 => VK_LMENU.0,
-            _ if key == VK_LMENU.0 => VK_LMENU.0,
-            _ if key == VK_RMENU.0 => VK_LMENU.0,
-            _ if key == VK_LWIN.0 => VK_LWIN.0,
-            _ if key == VK_RWIN.0 => VK_LWIN.0,
-            _ => key,
+    /// Turns `LShift` and `RShift` keydowns into `Shift`
+    pub fn normalize_shift(&mut self) {
+        if self.is_down(VKey::LShift.to_vk_code()) {
+            self.keyup(VKey::LShift.to_vk_code());
+            self.keydown(VKey::Shift.to_vk_code());
+        }
+        if self.is_down(VKey::RShift.to_vk_code()) {
+            self.keyup(VKey::RShift.to_vk_code());
+            self.keydown(VKey::Shift.to_vk_code());
+        }
+    }
+
+    /// Turns `LControl` and `RControl` keydowns into `Control`
+    pub fn normalize_control(&mut self) {
+        if self.is_down(VKey::LControl.to_vk_code()) {
+            self.keyup(VKey::LControl.to_vk_code());
+            self.keydown(VKey::Control.to_vk_code());
+        }
+        if self.is_down(VKey::RControl.to_vk_code()) {
+            self.keyup(VKey::RControl.to_vk_code());
+            self.keydown(VKey::Control.to_vk_code());
+        }
+    }
+
+    /// Turns `LMenu` and `RMenu` keydowns into `Menu`
+    pub fn normalize_menu(&mut self) {
+        if self.is_down(VKey::LMenu.to_vk_code()) {
+            self.keyup(VKey::LMenu.to_vk_code());
+            self.keydown(VKey::Menu.to_vk_code());
+        }
+        if self.is_down(VKey::RMenu.to_vk_code()) {
+            self.keyup(VKey::RMenu.to_vk_code());
+            self.keydown(VKey::Menu.to_vk_code());
         }
     }
 }
@@ -190,9 +200,9 @@ mod tests {
         keyboard.keydown(70);
         keyboard.keydown(129);
 
-        assert_eq!(keyboard.flags[0], 1 << (65 % 128), "Key 65 should be set");
-        assert_eq!(keyboard.flags[0], 1 << (70 % 128), "Key 70 should be set");
-        assert_eq!(keyboard.flags[1], 1 << (129 % 128), "Key 129 should be set");
+        assert_eq!(true, keyboard.is_down(65), "Key 65 should be set");
+        assert_eq!(true, keyboard.is_down(70), "Key 70 should be set");
+        assert_eq!(true, keyboard.is_down(129), "Key 129 should be set");
 
         // Release some keys
         keyboard.keyup(65);

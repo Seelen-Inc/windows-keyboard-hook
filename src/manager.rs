@@ -58,7 +58,7 @@ impl<T> HotkeyManager<T> {
         let state = hotkey.generate_keyboard_state();
         if self.hotkeys.values().any(|vec| {
             vec.iter()
-                .any(|hotkey| hotkey.generate_keyboard_state() == state)
+                .any(|hotkey| hotkey.check_state(state))
         }) {
             return Err(RegistrationFailed);
         }
@@ -106,7 +106,7 @@ impl<T> HotkeyManager<T> {
                 let mut found = false;
                 if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
                     for hotkey in hotkeys {
-                        if hotkey.generate_keyboard_state() == state {
+                        if hotkey.check_state(state) {
                             if state.is_down(VK_LWIN.0) {
                                 hook.key_action(KeyAction::Replace);
                             } else {

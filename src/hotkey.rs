@@ -44,16 +44,20 @@ impl<T> Hotkey<T> {
         (self.callback)()
     }
 
-    /// Generates a `KeyboardState` representing the hotkey.
-    ///
-    /// This includes both the trigger key and all modifier keys.
-    pub fn generate_keyboard_state(&self) -> KeyboardState {
-        let mut keyboard_state = KeyboardState::new();
-        keyboard_state.keydown(self.trigger_key.to_vk_code());
-        for key in &self.modifiers {
-            keyboard_state.keydown(key.to_vk_code());
+    /// Checks if current keyboard state should trigger hotkey callback.
+    pub fn check_state(&self, keyboard_state: KeyboardState) -> bool {
+        let mut state = keyboard_state;
+        let mut keys = self.modifiers.clone();
+        keys.push(self.trigger_key);
+        for key in keys {
+            match key {
+                _ if key.to_vk_code() == VKey::Shift.to_vk_code() => state.normalize_shift(),
+                _ if key.to_vk_code() == VKey::Control.to_vk_code() => state.normalize_control(),
+                _ if key.to_vk_code() == VKey::Menu.to_vk_code() => state.normalize_menu(),
+                _ => {}
+            }
         }
-        keyboard_state
+        self.generate_keyboard_state() == state
     }
 
     /// Generates a unique ID for the hotkey.
@@ -65,6 +69,18 @@ impl<T> Hotkey<T> {
         self.modifiers.hash(&mut hasher);
         let hash = hasher.finish();
         (hash & 0xFFFF_FFFF) as i32
+    }
+
+    /// Generates a `KeyboardState` representing the hotkey.
+    ///
+    /// This includes both the trigger key and all modifier keys.
+    pub fn generate_keyboard_state(&self) -> KeyboardState {
+        let mut keyboard_state = KeyboardState::new();
+        keyboard_state.keydown(self.trigger_key.to_vk_code());
+        for key in &self.modifiers {
+            keyboard_state.keydown(key.to_vk_code());
+        }
+        keyboard_state
     }
 }
 
