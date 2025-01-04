@@ -30,11 +30,11 @@ use win_hotkeys::HotkeyManager;
 fn main() {
     let mut hkm = HotkeyManager::new();
 
-    hkm.register_hotkey(VKey::A, &[VKey::Control], || {
+    hkm.register_hotkey(VKey::A, &[VKey::from_keyname("ctrl").unwrap()], || {
         println!("Hotkey CTRL + A was pressed");
     }).unwrap();
-    
-    hkm.register_hotkey(VKey::B, &[VKey::from_keyname("win"), VKey::from_keyname("shift")], || {
+
+    hkm.register_hotkey(VKey::B, &[VKey::LWin, VKey::Shift], || {
         println!("Hotkey WIN + SHIFT + B was pressed");
     }).unwrap();
 
@@ -47,19 +47,25 @@ The `VKey` enum in this library is based on the [Microsoft Virtual-Key Codes](ht
 key codes for a wide range of keyboard keys. This provides a comprehensive and standardized set of keys
 that can be used to define hotkeys.
 
-To make the system more user-friendly, **common alias names** are also supported. For example, 
+A small list of **common alias names** are also supported:
 
-- `Ctrl` can be used as an alias for `Control`(`VK_CONTROL`)
-- `Alt` can be used as an alias for `Menu`(`VK_MENU`)
-- `Win` can be used as an alias for `LWin`(`VK_LWIN`) or `RWin`(`VK_RWIN`).
+- `Ctrl`: `Control`(`VK_CONTROL`)
+- `LCtrl` : `LControl`(`VK_LCONTROL`)
+- `RCtrl`: `RControl`(`VK_RCONTROL`)
+- `Alt`:  `Menu`(`VK_MENU`)
+- `LAlt`: `LMenu`(`VK_LMENU`)
+- `RAlt`: `RMenu`(`VK_RMENU`)
+- `Win`: `LWin`(`VK_LWIN`)
 
-NOTE: Hotkeys do not differentiate between left/right versions of keys. `Shift`, `LShift`
-or `RShift`, for example, will be treated as equivalent in any hotkey.
+For keys that have distinct left and right versions, the default key will work with either key **when used 
+as a modifier**. For example, using `Shift` as a modifier will trigger the hotkey when either `LShift` or 
+`RShift` is pressed, but if used as a trigger key it will only respond if `Shift` is pressed (which is not
+present on most keyboards).
 
 ```rust
-let key1 = VKey::from_keyname("VK_MENU"); // Official name
-let key2 = VKey::from_keyname("alt");     // Alias for VK_MENU
-let key3 = Vkey::from_keyname("MENU");    // Omitted VK_
+let key1 = VKey::from_keyname("VK_MENU").unwrap(); // Official name
+let key2 = VKey::from_keyname("alt").unwrap();     // Alias for VK_MENU
+let key3 = VKey::from_keyname("MENU").unwrap();    // Omitted VK_
 
 assert_eq!(key1, key2);
 assert_eq!(key1, key3);
