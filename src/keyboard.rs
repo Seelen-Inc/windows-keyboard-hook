@@ -4,17 +4,17 @@
 //! It supports key press (`keydown`), key release (`keyup`), and querying key state (`is_down`).
 //! Additionally, it normalizes certain keys (e.g., treating left and right control as the same key).
 
-use crate::keys::VKey;
-
-#[derive(Debug, Copy, Clone)]
-pub struct KeyboardState {
-    flags: [u128; 2],
-}
+use crate::VKey;
 
 /// Represents the state of keyboard keys.
 ///
 /// Tracks which keys are currently pressed using two 128-bit flags, allowing
 /// support for 256 keys.
+#[derive(Debug, Copy, Clone)]
+pub struct KeyboardState {
+    flags: [u128; 2],
+}
+
 impl KeyboardState {
     /// Creates a new `KeyboardState` with all keys released.
     pub fn new() -> KeyboardState {

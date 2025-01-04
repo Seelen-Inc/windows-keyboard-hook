@@ -1,7 +1,7 @@
 use std::thread::{sleep, spawn};
 use std::time::Duration;
-use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 
 fn main() {
     // Create the manager

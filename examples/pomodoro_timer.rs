@@ -1,6 +1,6 @@
 use std::{thread, time};
-use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_OK};

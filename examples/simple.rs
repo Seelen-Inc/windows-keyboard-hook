@@ -1,5 +1,5 @@
-use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 
 fn main() {
     let mut hkm = HotkeyManager::new();

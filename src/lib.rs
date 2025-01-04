@@ -2,7 +2,7 @@
 //!
 //! Win-hotkeys is a Rust library for creating and managing global hotkeys on Windows.
 //! It provides an ergonomic API for setting up keyboard hooks, registering hotkeys,
-//! and handling keyboard events in a safe manner.
+//! and handling keyboard events in a safe and efficient manner.
 
 #[cfg(windows)]
 pub mod error;
@@ -13,9 +13,11 @@ pub mod hotkey;
 #[cfg(windows)]
 pub mod keyboard;
 #[cfg(windows)]
-pub mod keys;
+mod keys;
 #[cfg(windows)]
 mod manager;
 
+#[cfg(windows)]
+pub use keys::*;
 #[cfg(windows)]
 pub use manager::*;

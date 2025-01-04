@@ -5,7 +5,7 @@
 //! that is executed when the hotkey is triggered.
 
 use crate::keyboard::KeyboardState;
-use crate::keys::VKey;
+use crate::VKey;
 use std::fmt;
 use std::hash::{DefaultHasher, Hash, Hasher};
 

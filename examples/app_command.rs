@@ -1,7 +1,7 @@
 use crossbeam_channel::unbounded;
 use std::thread;
-use win_hotkeys::keys::VKey;
 use win_hotkeys::HotkeyManager;
+use win_hotkeys::VKey;
 
 enum AppCommand {
     AppCommand1,
