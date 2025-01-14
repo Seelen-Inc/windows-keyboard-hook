@@ -9,7 +9,7 @@ use crate::VKey;
 /// support for 256 keys.
 #[derive(Debug, Copy, Clone)]
 pub struct KeyboardState {
-    flags: [u128; 2],
+    pub flags: [u128; 2],
 }
 
 impl KeyboardState {

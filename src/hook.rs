@@ -10,8 +10,8 @@ use std::thread;
 use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
-    VIRTUAL_KEY,
+    GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+    KEYEVENTF_KEYUP, VIRTUAL_KEY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
@@ -157,10 +157,33 @@ fn update_keyboard_state(vk_code: u16, keydown: bool) {
     let mutex = KEYBOARD_STATE.get();
     let mut keyboard = mutex.unwrap().lock().unwrap();
     if keydown {
+        // Check that any cached pressed keys are still pressed
+        // before updating keyboard state
+        for bit_index in 0..128 {
+            let mask = 1u128 << bit_index;
+            if keyboard.flags[0] & mask != 0 {
+                let vkey = bit_index as u16;
+                if !is_key_down(vkey) {
+                    keyboard.keyup(vkey);
+                }
+            }
+
+            if keyboard.flags[1] & mask != 0 {
+                let vkey = (bit_index + 128) as u16;
+                if !is_key_down(vkey) {
+                    keyboard.keyup(vkey);
+                }
+            }
+        }
         keyboard.keydown(vk_code);
     } else {
         keyboard.keyup(vk_code);
     }
+}
+
+/// Gets whether the specified key is currently down.
+fn is_key_down(key: u16) -> bool {
+    unsafe { (GetAsyncKeyState(key.into()) & -0x8000) != 0 }
 }
 
 /// Sends a keydown and keyup event for Unassigned Virtual Key 0xE8.
