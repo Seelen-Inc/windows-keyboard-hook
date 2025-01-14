@@ -11,7 +11,7 @@ modifier.
 
 ```toml
 [dependencies]
-win-hotkeys = "0.4.0"
+win-hotkeys = "0.4.1"
 ```
 
 ## Features
@@ -78,13 +78,11 @@ fn main() {
 
     hkm.register_hotkey(VKey::A, &[key1, VKey::Shift], || {
         println!("Hotkey ALT + SHIFT (LSHIFT or RSHIFT) + A was pressed");
-    })
-        .unwrap();
+    }).unwrap();
 
     hkm.register_hotkey(VKey::B, &[VKey::LShift], || {
         println!("Hotkey LSHIFT + B was pressed"); // will not trigger on RSHIFT + B
-    })
-        .unwrap();
+    }).unwrap();
 
     hkm.event_loop();
 }
