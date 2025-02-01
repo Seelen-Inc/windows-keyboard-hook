@@ -79,12 +79,12 @@ impl KeyboardState {
         print!("Pressed keys: ");
         for (i, &mask) in self.flags.iter().enumerate() {
             for bit in 0..128 {
-                //match bit {
-                //    _ if bit as u16 == VKey::Shift.to_vk_code() => continue,
-                //    _ if bit as u16 == VKey::Control.to_vk_code() => continue,
-                //    _ if bit as u16 == VKey::Menu.to_vk_code() => continue,
-                //    _ => {}
-                //}
+                match bit {
+                    _ if bit as u16 == VKey::Shift.to_vk_code() => continue,
+                    _ if bit as u16 == VKey::Control.to_vk_code() => continue,
+                    _ if bit as u16 == VKey::Menu.to_vk_code() => continue,
+                    _ => {}
+                }
                 if mask & (1 << bit) != 0 {
                     let vk_code = (i * 128 + bit) as u16;
                     let vkey = VKey::from_vk_code(vk_code);

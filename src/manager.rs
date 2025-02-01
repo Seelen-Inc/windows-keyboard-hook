@@ -56,7 +56,7 @@ impl<T> HotkeyManager<T> {
         if self
             .hotkeys
             .values()
-            .any(|vec| vec.iter().any(|hotkey| hotkey.check_state(state)))
+            .any(|vec| vec.iter().any(|hotkey|  hotkey.generate_keyboard_state() == state))
         {
             return Err(RegistrationFailed);
         }
