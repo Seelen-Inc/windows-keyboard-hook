@@ -19,10 +19,23 @@ impl KeyboardState {
     }
 
     /// Marks a key as pressed.
+    ///
+    /// Keys VK_Shift, VK_Control, and VK_Menu will be marked
+    /// as pressed when either the left or right version is
+    /// pressed.
     pub fn keydown(&mut self, key: u16) {
         let index = (key / 128) as usize;
         let position = key % 128;
         self.flags[index] |= 1 << position;
+        match key {
+            _ if key == VKey::LShift.to_vk_code() => self.keydown(VKey::Shift.to_vk_code()),
+            _ if key == VKey::RShift.to_vk_code() => self.keydown(VKey::Shift.to_vk_code()),
+            _ if key == VKey::LControl.to_vk_code() => self.keydown(VKey::Control.to_vk_code()),
+            _ if key == VKey::RControl.to_vk_code() => self.keydown(VKey::Control.to_vk_code()),
+            _ if key == VKey::LMenu.to_vk_code() => self.keydown(VKey::Menu.to_vk_code()),
+            _ if key == VKey::RMenu.to_vk_code() => self.keydown(VKey::Menu.to_vk_code()),
+            _ => {}
+        }
     }
 
     /// Marks a key as released.
@@ -30,6 +43,23 @@ impl KeyboardState {
         let index = (key / 128) as usize;
         let position = key % 128;
         self.flags[index] &= !(1 << position);
+
+        if key == VKey::LShift.to_vk_code() || key == VKey::RShift.to_vk_code() {
+            if !self.is_down(VKey::LShift.to_vk_code()) && !self.is_down(VKey::RShift.to_vk_code())
+            {
+                self.keyup(VKey::Shift.to_vk_code());
+            }
+        } else if key == VKey::LControl.to_vk_code() || key == VKey::RControl.to_vk_code() {
+            if !self.is_down(VKey::LControl.to_vk_code())
+                && !self.is_down(VKey::RControl.to_vk_code())
+            {
+                self.keyup(VKey::Control.to_vk_code());
+            }
+        } else if key == VKey::LMenu.to_vk_code() || key == VKey::RMenu.to_vk_code() {
+            if !self.is_down(VKey::LMenu.to_vk_code()) && !self.is_down(VKey::RMenu.to_vk_code()) {
+                self.keyup(VKey::Menu.to_vk_code());
+            }
+        }
     }
 
     /// Checks if a key is currently pressed.
@@ -44,40 +74,29 @@ impl KeyboardState {
         self.flags = [0, 0];
     }
 
-    /// Turns `LShift` and `RShift` keydowns into `Shift`
-    pub fn normalize_shift(&mut self) {
-        if self.is_down(VKey::LShift.to_vk_code()) {
-            self.keyup(VKey::LShift.to_vk_code());
-            self.keydown(VKey::Shift.to_vk_code());
+    /// Prints all pressed keys
+    pub fn print_pressed_keys(&self) {
+        print!("Pressed keys: ");
+        for (i, &mask) in self.flags.iter().enumerate() {
+            for bit in 0..128 {
+                //match bit {
+                //    _ if bit as u16 == VKey::Shift.to_vk_code() => continue,
+                //    _ if bit as u16 == VKey::Control.to_vk_code() => continue,
+                //    _ if bit as u16 == VKey::Menu.to_vk_code() => continue,
+                //    _ => {}
+                //}
+                if mask & (1 << bit) != 0 {
+                    let vk_code = (i * 128 + bit) as u16;
+                    let vkey = VKey::from_vk_code(vk_code);
+                    print!(
+                        "{} ({}), ",
+                        vkey.to_string().trim_start_matches("VK_"),
+                        vk_code
+                    );
+                }
+            }
         }
-        if self.is_down(VKey::RShift.to_vk_code()) {
-            self.keyup(VKey::RShift.to_vk_code());
-            self.keydown(VKey::Shift.to_vk_code());
-        }
-    }
-
-    /// Turns `LControl` and `RControl` keydowns into `Control`
-    pub fn normalize_control(&mut self) {
-        if self.is_down(VKey::LControl.to_vk_code()) {
-            self.keyup(VKey::LControl.to_vk_code());
-            self.keydown(VKey::Control.to_vk_code());
-        }
-        if self.is_down(VKey::RControl.to_vk_code()) {
-            self.keyup(VKey::RControl.to_vk_code());
-            self.keydown(VKey::Control.to_vk_code());
-        }
-    }
-
-    /// Turns `LMenu` and `RMenu` keydowns into `Menu`
-    pub fn normalize_menu(&mut self) {
-        if self.is_down(VKey::LMenu.to_vk_code()) {
-            self.keyup(VKey::LMenu.to_vk_code());
-            self.keydown(VKey::Menu.to_vk_code());
-        }
-        if self.is_down(VKey::RMenu.to_vk_code()) {
-            self.keyup(VKey::RMenu.to_vk_code());
-            self.keydown(VKey::Menu.to_vk_code());
-        }
+        println!();
     }
 }
 

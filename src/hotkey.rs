@@ -43,19 +43,55 @@ impl<T> Hotkey<T> {
     }
 
     /// Checks if current keyboard state should trigger hotkey callback.
+    /// This should only be called if the most recent keypress is the
+    /// trigger key for the hotkey.
     pub fn check_state(&self, keyboard_state: KeyboardState) -> bool {
-        let mut state = keyboard_state;
+        let mut mods = vec![
+            VKey::LShift,
+            VKey::RShift,
+            VKey::Shift,
+            VKey::LControl,
+            VKey::RControl,
+            VKey::Control,
+            VKey::LMenu,
+            VKey::RMenu,
+            VKey::Menu,
+            VKey::LWin,
+            VKey::RWin,
+        ];
         let mut keys = self.modifiers.clone();
         keys.push(self.trigger_key);
-        for key in keys {
+        for key in &keys {
+            if !keyboard_state.is_down(key.to_vk_code()) {
+                return false;
+            }
             match key {
-                _ if key.to_vk_code() == VKey::Shift.to_vk_code() => state.normalize_shift(),
-                _ if key.to_vk_code() == VKey::Control.to_vk_code() => state.normalize_control(),
-                _ if key.to_vk_code() == VKey::Menu.to_vk_code() => state.normalize_menu(),
+                VKey::Shift => mods.retain(|&key| {
+                    key != VKey::Shift && key != VKey::LShift && key != VKey::RShift
+                }),
+                VKey::LShift => mods.retain(|&key| key != VKey::Shift && key != VKey::LShift),
+                VKey::RShift => mods.retain(|&key| key != VKey::Shift && key != VKey::RShift),
+                VKey::Control => mods.retain(|&key| {
+                    key != VKey::Control && key != VKey::LControl && key != VKey::RControl
+                }),
+                VKey::LControl => mods.retain(|&key| key != VKey::Control && key != VKey::LControl),
+                VKey::RControl => mods.retain(|&key| key != VKey::Control && key != VKey::RControl),
+                VKey::Menu => mods
+                    .retain(|&key| key != VKey::Menu && key != VKey::LMenu && key != VKey::RMenu),
+                VKey::LMenu => mods.retain(|&key| key != VKey::Menu && key != VKey::LMenu),
+                VKey::RMenu => mods.retain(|&key| key != VKey::Menu && key != VKey::RMenu),
                 _ => {}
             }
         }
-        self.generate_keyboard_state() == state
+
+        // If any other generic modifiers are down the hotkey should not trigger
+        for modifier in &mods {
+            if keyboard_state.is_down(modifier.to_vk_code()) {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Generates a unique ID for the hotkey.
