@@ -80,6 +80,8 @@ impl<T> Hotkey<T> {
                     .retain(|&key| key != VKey::Menu && key != VKey::LMenu && key != VKey::RMenu),
                 VKey::LMenu => mods.retain(|&key| key != VKey::Menu && key != VKey::LMenu),
                 VKey::RMenu => mods.retain(|&key| key != VKey::Menu && key != VKey::RMenu),
+                VKey::LWin => mods.retain(|&key| key != VKey::LWin && key != VKey::RWin),
+                VKey::RWin => mods.retain(|&key| key != VKey::LWin && key != VKey::RWin),
                 _ => {}
             }
         }
