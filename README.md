@@ -11,7 +11,7 @@ modifier.
 
 ```toml
 [dependencies]
-win-hotkeys = "0.4.1"
+win-hotkeys = "0.4.2"
 ```
 
 ## Features
