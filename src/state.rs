@@ -4,11 +4,13 @@
 use crate::VKey;
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 
-/// Represents the state of keyboard keys.
+/// Represents a state of pressed keys on a keyboard.
+/// Can be used to track the current state of the keyboard
+/// or to represent a keyboard state for hotkeys.
 ///
-/// Tracks which keys are currently pressed using two 128-bit flags, allowing
+/// Tracks pressed keys using two 128-bit flags, allowing
 /// support for 256 keys.
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct KeyboardState {
     pub flags: [u128; 2],
 }
@@ -53,7 +55,8 @@ impl KeyboardState {
         (self.flags[index] & (1 << position)) != 0
     }
 
-    /// Ensures that all tracked keys are actually pressed.
+    /// Checks the state of each pressed key against
+    /// the OS and removes them if they are not pressed.
     pub fn sync(&mut self) {
         for vk_code in 0..128 {
             let mask = 1u128 << vk_code;
@@ -71,34 +74,36 @@ impl KeyboardState {
         self.flags = [0, 0];
     }
 
-    /// Prints all pressed keys
-    pub fn print_pressed_keys(&self) {
-        print!("Pressed keys: ");
-        for (i, &mask) in self.flags.iter().enumerate() {
-            for bit in 0..128 {
-                match bit {
-                    _ if bit as u16 == VKey::Shift.to_vk_code() => continue,
-                    _ if bit as u16 == VKey::Control.to_vk_code() => continue,
-                    _ if bit as u16 == VKey::Menu.to_vk_code() => continue,
-                    _ => {}
-                }
-                if mask & (1 << bit) != 0 {
-                    let vk_code = (i * 128 + bit) as u16;
-                    let vkey = VKey::from_vk_code(vk_code);
-                    print!(
-                        "{} ({}), ",
-                        vkey.to_string().trim_start_matches("VK_"),
-                        vk_code
-                    );
-                }
+    /// Returns whether a key is currently pressed according to
+    /// the OS.
+    pub fn get_async_key_state(key: u16) -> bool {
+        unsafe { (GetAsyncKeyState(key.into()) & -0x8000) != 0 }
+    }
+}
+
+impl std::fmt::Debug for KeyboardState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut keys = Vec::new();
+        for vk_code in 0..128 {
+            match vk_code {
+                _ if vk_code == VKey::Shift.to_vk_code() => continue,
+                _ if vk_code == VKey::Control.to_vk_code() => continue,
+                _ if vk_code == VKey::Menu.to_vk_code() => continue,
+                _ => {}
+            }
+            let mask = 1u128 << vk_code;
+            if self.flags[0] & mask != 0 {
+                keys.push(VKey::from_vk_code(vk_code));
+            }
+            if self.flags[1] & mask != 0 {
+                keys.push(VKey::from_vk_code(vk_code + 128));
             }
         }
-        println!();
-    }
-
-    /// Gets whether the specified key is currently down.
-    fn get_async_key_state(key: u16) -> bool {
-        unsafe { (GetAsyncKeyState(key.into()) & -0x8000) != 0 }
+        f.debug_struct("KeyboardState")
+            //.field("flags[0]",  &format!("{:0128b}", &self.flags[0]))
+            //.field("flags[1]", &format!("{:0128b}", &self.flags[1]))
+            .field("Keys", &keys)
+            .finish()
     }
 }
 
