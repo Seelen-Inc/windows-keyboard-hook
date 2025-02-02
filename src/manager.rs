@@ -7,7 +7,7 @@ use crate::error::WHKError::RegistrationFailed;
 use crate::hook;
 use crate::hook::{KeyAction, KeyboardEvent};
 use crate::hotkey::Hotkey;
-use crate::keyboard::KeyboardState;
+use crate::state::KeyboardState;
 use crate::VKey;
 use crossbeam_channel::Sender;
 use std::collections::HashMap;
@@ -53,11 +53,10 @@ impl<T> HotkeyManager<T> {
 
         // Check if already exists
         let state = hotkey.generate_keyboard_state();
-        if self
-            .hotkeys
-            .values()
-            .any(|vec| vec.iter().any(|hotkey|  hotkey.generate_keyboard_state() == state))
-        {
+        if self.hotkeys.values().any(|vec| {
+            vec.iter()
+                .any(|hotkey| hotkey.generate_keyboard_state() == state)
+        }) {
             return Err(RegistrationFailed);
         }
 
@@ -104,7 +103,7 @@ impl<T> HotkeyManager<T> {
                 let mut found = false;
                 if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
                     for hotkey in hotkeys {
-                        if hotkey.check_state(state) {
+                        if hotkey.is_trigger_state(state) {
                             if state.is_down(VKey::LWin.to_vk_code()) {
                                 hook.key_action(KeyAction::Replace);
                             } else {
