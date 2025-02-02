@@ -3,20 +3,19 @@
 //! and releases, tracks the state of modifier keys, and communicates events
 //! via channels to the rest of the application.
 
-use crate::keyboard::KeyboardState;
+use crate::state::KeyboardState;
 use crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use std::sync::{Mutex, OnceLock, RwLock};
 use std::thread;
 use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+    VIRTUAL_KEY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
-    UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
-    WM_SYSKEYUP,
+    UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 
 /// Timeout for blocking key events, measured in milliseconds.
@@ -153,37 +152,11 @@ pub fn start() -> KeyboardHook {
 }
 
 /// Updates global keyboard state for given virtual key code.
-fn update_keyboard_state(vk_code: u16, keydown: bool) {
+fn update_keyboard_state(vk_code: u16) {
     let mutex = KEYBOARD_STATE.get();
     let mut keyboard = mutex.unwrap().lock().unwrap();
-    if keydown {
-        // Check that any cached pressed keys are still pressed
-        // before updating keyboard state
-        for bit_index in 0..128 {
-            let mask = 1u128 << bit_index;
-            if keyboard.flags[0] & mask != 0 {
-                let vkey = bit_index as u16;
-                if !is_key_down(vkey) {
-                    keyboard.keyup(vkey);
-                }
-            }
-
-            if keyboard.flags[1] & mask != 0 {
-                let vkey = (bit_index + 128) as u16;
-                if !is_key_down(vkey) {
-                    keyboard.keyup(vkey);
-                }
-            }
-        }
-        keyboard.keydown(vk_code);
-    } else {
-        keyboard.keyup(vk_code);
-    }
-}
-
-/// Gets whether the specified key is currently down.
-fn is_key_down(key: u16) -> bool {
-    unsafe { (GetAsyncKeyState(key.into()) & -0x8000) != 0 }
+    keyboard.sync();
+    keyboard.keydown(vk_code);
 }
 
 /// Sends a keydown and keyup event for Unassigned Virtual Key 0xE8.
@@ -232,9 +205,9 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
         }
 
         match event_type {
+            // We only care about key down events
             WM_KEYDOWN | WM_SYSKEYDOWN => {
-                // Update and send keyboard state
-                update_keyboard_state(vk_code, true);
+                update_keyboard_state(vk_code);
                 event_tx
                     .send(KeyboardEvent::KeyDown {
                         vk_code,
@@ -255,9 +228,6 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
                         KeyAction::Allow => {}
                     }
                 }
-            }
-            WM_KEYUP | WM_SYSKEYUP => {
-                update_keyboard_state(vk_code, false);
             }
             _ => {}
         };

@@ -2,7 +2,7 @@
 //! A hotkey is composed of a trigger key, one or more modifier keys, and a callback function
 //! that is executed when the hotkey is triggered.
 
-use crate::keyboard::KeyboardState;
+use crate::state::KeyboardState;
 use crate::VKey;
 use std::fmt;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -45,7 +45,7 @@ impl<T> Hotkey<T> {
     /// Checks if current keyboard state should trigger hotkey callback.
     /// This should only be called if the most recent keypress is the
     /// trigger key for the hotkey.
-    pub fn check_state(&self, keyboard_state: KeyboardState) -> bool {
+    pub fn is_trigger_state(&self, keyboard_state: KeyboardState) -> bool {
         let state = self.generate_keyboard_state();
         let mut keys = self.modifiers.clone();
         keys.push(self.trigger_key);

@@ -2,6 +2,7 @@
 //! It supports key press (`keydown`), key release (`keyup`), and querying key state (`is_down`).
 
 use crate::VKey;
+use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 
 /// Represents the state of keyboard keys.
 ///
@@ -43,23 +44,6 @@ impl KeyboardState {
         let index = (key / 128) as usize;
         let position = key % 128;
         self.flags[index] &= !(1 << position);
-
-        if key == VKey::LShift.to_vk_code() || key == VKey::RShift.to_vk_code() {
-            if !self.is_down(VKey::LShift.to_vk_code()) && !self.is_down(VKey::RShift.to_vk_code())
-            {
-                self.keyup(VKey::Shift.to_vk_code());
-            }
-        } else if key == VKey::LControl.to_vk_code() || key == VKey::RControl.to_vk_code() {
-            if !self.is_down(VKey::LControl.to_vk_code())
-                && !self.is_down(VKey::RControl.to_vk_code())
-            {
-                self.keyup(VKey::Control.to_vk_code());
-            }
-        } else if key == VKey::LMenu.to_vk_code() || key == VKey::RMenu.to_vk_code() {
-            if !self.is_down(VKey::LMenu.to_vk_code()) && !self.is_down(VKey::RMenu.to_vk_code()) {
-                self.keyup(VKey::Menu.to_vk_code());
-            }
-        }
     }
 
     /// Checks if a key is currently pressed.
@@ -67,6 +51,19 @@ impl KeyboardState {
         let index = (key / 128) as usize;
         let position = key % 128;
         (self.flags[index] & (1 << position)) != 0
+    }
+
+    /// Ensures that all tracked keys are actually pressed.
+    pub fn sync(&mut self) {
+        for vk_code in 0..128 {
+            let mask = 1u128 << vk_code;
+            if self.flags[0] & mask != 0 && !Self::get_async_key_state(vk_code) {
+                self.keyup(vk_code);
+            }
+            if self.flags[1] & mask != 0 && !Self::get_async_key_state(vk_code + 128) {
+                self.keyup(vk_code + 128);
+            }
+        }
     }
 
     /// Clears the state of all keys, marking them as released.
@@ -97,6 +94,11 @@ impl KeyboardState {
             }
         }
         println!();
+    }
+
+    /// Gets whether the specified key is currently down.
+    fn get_async_key_state(key: u16) -> bool {
+        unsafe { (GetAsyncKeyState(key.into()) & -0x8000) != 0 }
     }
 }
 

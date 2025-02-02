@@ -11,11 +11,11 @@ pub mod hook;
 #[cfg(windows)]
 pub mod hotkey;
 #[cfg(windows)]
-pub mod keyboard;
-#[cfg(windows)]
 mod keys;
 #[cfg(windows)]
 mod manager;
+#[cfg(windows)]
+pub mod state;
 
 #[cfg(windows)]
 pub use keys::*;
