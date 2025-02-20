@@ -46,6 +46,22 @@ impl KeyboardState {
         let index = (key / 128) as usize;
         let position = key % 128;
         self.flags[index] &= !(1 << position);
+        if (key == VKey::LShift.to_vk_code() || key == VKey::RShift.to_vk_code())
+            && !self.is_down(VKey::LShift.to_vk_code())
+            && !self.is_down(VKey::RShift.to_vk_code())
+        {
+            self.keyup(VKey::Shift.to_vk_code());
+        } else if (key == VKey::LControl.to_vk_code() || key == VKey::RControl.to_vk_code())
+            && !self.is_down(VKey::LControl.to_vk_code())
+            && !self.is_down(VKey::RControl.to_vk_code())
+        {
+            self.keyup(VKey::Control.to_vk_code());
+        } else if (key == VKey::LMenu.to_vk_code() || key == VKey::RMenu.to_vk_code())
+            && !self.is_down(VKey::LMenu.to_vk_code())
+            && !self.is_down(VKey::RMenu.to_vk_code())
+        {
+            self.keyup(VKey::Menu.to_vk_code());
+        }
     }
 
     /// Checks if a key is currently pressed.
