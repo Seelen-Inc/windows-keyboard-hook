@@ -54,24 +54,22 @@ impl<T> HotkeyManager<T> {
         callback: impl Fn() -> T + Send + 'static,
     ) -> Result<i32, WHKError> {
         let hotkey = Hotkey::new(trigger_key, mod_keys, callback);
+        let id = hotkey.generate_id();
 
         // Check if already exists
-        let state = hotkey.generate_keyboard_state();
         if self.hotkeys.values().any(|vec| {
             vec.iter()
-                .any(|hotkey| hotkey.generate_keyboard_state() == state)
+                .any(|hotkey| hotkey.generate_id() == id)
         }) {
             return Err(RegistrationFailed);
         }
 
         // Add hotkey and return id
-        let id = hotkey.generate_id();
-        let entry = self.hotkeys.entry(trigger_key.to_vk_code()).or_default();
-        entry.push(hotkey);
+        self.hotkeys.entry(trigger_key.to_vk_code()).or_default().push(hotkey);
         Ok(id)
     }
 
-    /// Unregisters a hotkey by its unique id
+    /// Unregisters a hotkey by its unique id.
     pub fn unregister_hotkey(&mut self, hotkey_id: i32) {
         for vec in self.hotkeys.values_mut() {
             vec.retain(|hotkey| hotkey.generate_id() != hotkey_id);
@@ -79,15 +77,15 @@ impl<T> HotkeyManager<T> {
         self.paused_ids.retain(|id| *id != hotkey_id);
     }
 
-    /// Unregisters all hotkeys
+    /// Unregisters all hotkeys.
     pub fn unregister_all(&mut self) {
         self.hotkeys.clear();
         self.paused_ids.clear();
     }
 
-    /// Registers a hotkey that will toggle the paused
-    /// state of win-hotkeys. When paused, only registered
-    /// pause hotkeys will be allowed to trigger
+    /// Registers a hotkey that will toggle the paused state of the
+    /// `HotkeyManager`. When paused, only registered pause hotkeys
+    /// will be allowed to trigger.
     pub fn register_pause_hotkey(
         &mut self,
         trigger_key: VKey,
@@ -105,7 +103,7 @@ impl<T> HotkeyManager<T> {
         Ok(id)
     }
 
-    /// Registers a channel for callback results to be sent into
+    /// Registers a channel for callback results to be sent into.
     pub fn register_channel(&mut self, channel: Sender<T>) {
         self.callback_results_channel = Some(channel);
     }
@@ -163,6 +161,13 @@ impl<T> HotkeyManager<T> {
             interrupt: Arc::clone(&self.interrupt),
         }
     }
+
+    /// Signals the `HotkeyManager` to pause processing of hotkeys.
+    pub fn pause_handle(&self) -> PauseHandle {
+        PauseHandle {
+            pause: Arc::clone(&self.paused),
+        }
+    }
 }
 
 /// A handle for signaling the `HotkeyManager` to stop its event loop.
@@ -170,12 +175,10 @@ impl<T> HotkeyManager<T> {
 /// The `InterruptHandle` is used to gracefully interrupt the event loop by sending
 /// a control signal. This allows the `HotkeyManager` to clean up resources and stop
 /// processing keyboard events.
+#[derive(Debug, Clone)]
 pub struct InterruptHandle {
     interrupt: Arc<AtomicBool>,
 }
-
-unsafe impl Sync for InterruptHandle {}
-unsafe impl Send for InterruptHandle {}
 
 impl InterruptHandle {
     /// Interrupts the `HotkeyManager`'s event loop.
@@ -193,5 +196,38 @@ impl InterruptHandle {
         if let Some(ke_tx) = &*event_tx {
             ke_tx.send(dummy_event).unwrap();
         }
+    }
+}
+
+/// A handle for signaling the `HotkeyManager` to stop processing hotkeys without
+/// exiting the event loop. When paused, the `HotkeyManager` will only process
+/// registered pause hotkeys.
+///
+/// The `PauseHandle` is used to manage the pause state of the `HotkeyManager`.
+#[derive(Debug, Clone)]
+pub struct PauseHandle {
+    pause: Arc<AtomicBool>,
+}
+
+impl PauseHandle {
+    /// Toggles the pause state of the `HotkeyManager`.
+    ///
+    /// If the `HotkeyManager` is currently paused, calling this method will resume
+    /// normal hotkey processing. If it is active, calling this method will pause it.
+    pub fn toggle(&self) {
+        self.pause.store(!self.pause.load(Ordering::Relaxed), Ordering::Relaxed);
+    }
+
+    /// Explicitly sets the pause state.
+    pub fn set(&self, state: bool) {
+        self.pause.store(state, Ordering::Relaxed);
+    }
+
+    /// Returns whether the `HotkeyManager` is currently paused.
+    ///
+    /// When paused, only pause hotkeys will be processed whikle all others will
+    /// be ignored.
+    pub fn is_paused(&self) -> bool {
+        self.pause.load(Ordering::Relaxed)
     }
 }
