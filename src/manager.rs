@@ -23,6 +23,8 @@ use std::sync::Arc;
 /// - `T`: The return type of the hotkey callbacks.
 pub struct HotkeyManager<T> {
     hotkeys: HashMap<u16, Vec<Hotkey<T>>>,
+    paused_ids: Vec<i32>,
+    paused: Arc<AtomicBool>,
     interrupt: Arc<AtomicBool>,
     callback_results_channel: Option<Sender<T>>,
 }
@@ -37,6 +39,8 @@ impl<T> HotkeyManager<T> {
     pub fn new() -> HotkeyManager<T> {
         Self {
             hotkeys: HashMap::new(),
+            paused_ids: Vec::new(),
+            paused: Arc::new(AtomicBool::new(false)),
             interrupt: Arc::new(AtomicBool::new(false)),
             callback_results_channel: None,
         }
@@ -72,11 +76,33 @@ impl<T> HotkeyManager<T> {
         for vec in self.hotkeys.values_mut() {
             vec.retain(|hotkey| hotkey.generate_id() != hotkey_id);
         }
+        self.paused_ids.retain(|id| *id != hotkey_id);
     }
 
     /// Unregisters all hotkeys
     pub fn unregister_all(&mut self) {
         self.hotkeys.clear();
+        self.paused_ids.clear();
+    }
+
+    /// Registers a hotkey that will toggle the paused
+    /// state of win-hotkeys. When paused, only registered
+    /// pause hotkeys will be allowed to trigger
+    pub fn register_pause_hotkey(
+        &mut self,
+        trigger_key: VKey,
+        mod_keys: &[VKey],
+        callback: impl Fn() -> T + Send + 'static,
+    ) -> Result<i32, WHKError> {
+        let paused = Arc::clone(&self.paused);
+        let wrapped_callback = move || {
+            let was_paused = paused.load(Ordering::Relaxed);
+            paused.store(!was_paused, Ordering::Relaxed);
+            callback()
+        };
+        let id = self.register_hotkey(trigger_key, mod_keys, wrapped_callback)?;
+        self.paused_ids.push(id);
+        Ok(id)
     }
 
     /// Registers a channel for callback results to be sent into
@@ -103,6 +129,11 @@ impl<T> HotkeyManager<T> {
                 let mut found = false;
                 if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
                     for hotkey in hotkeys {
+                        if self.paused.load(Ordering::Relaxed)
+                            && !self.paused_ids.contains(&hotkey.generate_id())
+                        {
+                            continue;
+                        }
                         if hotkey.is_trigger_state(state) {
                             if state.is_down(VKey::LWin.to_vk_code()) {
                                 hook.key_action(KeyAction::Replace);
@@ -129,7 +160,7 @@ impl<T> HotkeyManager<T> {
     /// Signals the `HotkeyManager` to interrupt its event loop.
     pub fn interrupt_handle(&self) -> InterruptHandle {
         InterruptHandle {
-            interrupt_handle: Arc::clone(&self.interrupt),
+            interrupt: Arc::clone(&self.interrupt),
         }
     }
 }
@@ -140,11 +171,10 @@ impl<T> HotkeyManager<T> {
 /// a control signal. This allows the `HotkeyManager` to clean up resources and stop
 /// processing keyboard events.
 pub struct InterruptHandle {
-    interrupt_handle: Arc<AtomicBool>,
+    interrupt: Arc<AtomicBool>,
 }
 
 unsafe impl Sync for InterruptHandle {}
-
 unsafe impl Send for InterruptHandle {}
 
 impl InterruptHandle {
@@ -158,7 +188,7 @@ impl InterruptHandle {
             vk_code: 0,
             keyboard_state: KeyboardState::new(),
         };
-        self.interrupt_handle.store(true, Ordering::Relaxed);
+        self.interrupt.store(true, Ordering::Relaxed);
         let event_tx = HOOK_EVENT_TX.read().unwrap();
         if let Some(ke_tx) = &*event_tx {
             ke_tx.send(dummy_event).unwrap();
