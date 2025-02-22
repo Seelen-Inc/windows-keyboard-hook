@@ -121,7 +121,7 @@ pub fn start() -> KeyboardHook {
                 loop {
                     let mut msg = MSG::default();
                     if GetMessageW(&mut msg, None, 0, 0).into() {
-                        TranslateMessage(&msg);
+                        let _ = TranslateMessage(&msg);
                         DispatchMessageW(&msg);
                     }
 

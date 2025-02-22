@@ -3,7 +3,7 @@ use std::time::Duration;
 use win_hotkeys::HotkeyManager;
 use win_hotkeys::VKey;
 
-fn main() { 
+fn main() {
     // Create the manager
     let mut hkm = HotkeyManager::new();
 
@@ -23,7 +23,7 @@ fn main() {
     // Create a second thread that will pause/interrupt hkm
     spawn(move || {
         sleep(Duration::from_secs(3));
-        
+
         println!("Pausing hotkeys for 3 seconds");
         pause_handle.toggle();
         sleep(Duration::from_secs(3));

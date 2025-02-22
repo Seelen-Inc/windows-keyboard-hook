@@ -28,7 +28,7 @@ fn main() {
 fn show_popup(title: &str, message: &str) {
     unsafe {
         MessageBoxW(
-            HWND(0),
+            Some(HWND(std::ptr::null_mut())),
             PCWSTR(to_wide_string(message).as_ptr()),
             PCWSTR(to_wide_string(title).as_ptr()),
             MB_OK,
