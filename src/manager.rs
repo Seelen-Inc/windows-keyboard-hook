@@ -200,8 +200,8 @@ impl InterruptHandle {
 }
 
 /// A handle for signaling the `HotkeyManager` to stop processing hotkeys without
-/// exiting the event loop. When paused, the `HotkeyManager` will only process
-/// registered pause hotkeys.
+/// exiting the event loop or unregistering hotkeys. When paused, the `HotkeyManager`
+/// will only process registered pause hotkeys.
 ///
 /// The `PauseHandle` is used to manage the pause state of the `HotkeyManager`.
 #[derive(Debug, Clone)]
@@ -225,7 +225,7 @@ impl PauseHandle {
 
     /// Returns whether the `HotkeyManager` is currently paused.
     ///
-    /// When paused, only pause hotkeys will be processed whikle all others will
+    /// When paused, only pause hotkeys will be processed while all others will
     /// be ignored.
     pub fn is_paused(&self) -> bool {
         self.pause.load(Ordering::Relaxed)
