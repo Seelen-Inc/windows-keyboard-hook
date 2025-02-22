@@ -18,7 +18,8 @@ fn main() {
     })
     .unwrap();
 
-    // Register pause hotkey. This hotkey will "turn off" all other hotkeys until it is pressed again.
+    // Register pause hotkey. This hotkey will toggle the pause state of win-hotkeys,
+    // allowing only registered pause hotkeys to be processed.
     let trigger_key = VKey::P;
     let modifiers = &[VKey::Control, VKey::Shift];
     hkm.register_pause_hotkey(trigger_key, modifiers, || {
