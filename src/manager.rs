@@ -57,15 +57,19 @@ impl<T> HotkeyManager<T> {
         let id = hotkey.generate_id();
 
         // Check if already exists
-        if self.hotkeys.values().any(|vec| {
-            vec.iter()
-                .any(|hotkey| hotkey.generate_id() == id)
-        }) {
+        if self
+            .hotkeys
+            .values()
+            .any(|vec| vec.iter().any(|hotkey| hotkey.generate_id() == id))
+        {
             return Err(RegistrationFailed);
         }
 
         // Add hotkey and return id
-        self.hotkeys.entry(trigger_key.to_vk_code()).or_default().push(hotkey);
+        self.hotkeys
+            .entry(trigger_key.to_vk_code())
+            .or_default()
+            .push(hotkey);
         Ok(id)
     }
 
@@ -215,7 +219,8 @@ impl PauseHandle {
     /// If the `HotkeyManager` is currently paused, calling this method will resume
     /// normal hotkey processing. If it is active, calling this method will pause it.
     pub fn toggle(&self) {
-        self.pause.store(!self.pause.load(Ordering::Relaxed), Ordering::Relaxed);
+        self.pause
+            .store(!self.pause.load(Ordering::Relaxed), Ordering::Relaxed);
     }
 
     /// Explicitly sets the pause state.
