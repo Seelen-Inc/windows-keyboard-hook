@@ -19,7 +19,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 /// Timeout for blocking key events, measured in milliseconds.
-const TIMEOUT: Duration = Duration::from_millis(100);
+const TIMEOUT: Duration = Duration::from_millis(250);
 
 /// Unassigned Virtual Key code used to suppress Windows Key events.
 const SILENT_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
@@ -207,6 +207,8 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
         match event_type {
             // We only care about key down events
             WM_KEYDOWN | WM_SYSKEYDOWN => {
+                // Clear the actions channel of any previous action
+                while let Ok(_) = response_rx.try_recv() {}
                 update_keyboard_state(vk_code);
                 event_tx
                     .send(KeyboardEvent::KeyDown {
