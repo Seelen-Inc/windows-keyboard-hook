@@ -4,8 +4,8 @@
 
 use crate::error::WHKError;
 use crate::error::WHKError::RegistrationFailed;
+use crate::events::{KeyAction, KeyboardInputEvent};
 use crate::hook;
-use crate::hook::{KeyAction, KeyboardEvent};
 use crate::hotkey::Hotkey;
 use crate::state::KeyboardState;
 use crate::VKey;
@@ -121,7 +121,7 @@ impl<T> HotkeyManager<T> {
         while !self.interrupt.load(Ordering::Relaxed) {
             if let Ok(event) = hook.recv() {
                 let (key_code, state) = match event {
-                    KeyboardEvent::KeyDown {
+                    KeyboardInputEvent::KeyDown {
                         vk_code: key_code,
                         keyboard_state: state,
                     } => (key_code, state),
@@ -190,8 +190,9 @@ impl InterruptHandle {
     /// This method sets an internal flag to indicate that the interruption has been requested.
     /// then sends a dummy keyboard event to the event loop to force it to check the flag.
     pub fn interrupt(&self) {
-        use crate::hook::{KeyboardEvent, HOOK_EVENT_TX};
-        let dummy_event = KeyboardEvent::KeyDown {
+        use crate::hook::HOOK_EVENT_TX;
+
+        let dummy_event = KeyboardInputEvent::KeyDown {
             vk_code: 0,
             keyboard_state: KeyboardState::new(),
         };

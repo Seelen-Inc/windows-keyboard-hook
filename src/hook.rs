@@ -3,6 +3,7 @@
 //! and releases, tracks the state of modifier keys, and communicates events
 //! via channels to the rest of the application.
 
+use crate::events::{ControlFlow, KeyAction, KeyboardInputEvent};
 use crate::state::KeyboardState;
 use crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use std::sync::{Mutex, OnceLock, RwLock};
@@ -25,7 +26,7 @@ const TIMEOUT: Duration = Duration::from_millis(250);
 const SILENT_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
 /// Channel sender used by hook proc to send keyboard events.
-pub static HOOK_EVENT_TX: RwLock<Option<Sender<KeyboardEvent>>> = RwLock::new(None);
+pub static HOOK_EVENT_TX: RwLock<Option<Sender<KeyboardInputEvent>>> = RwLock::new(None);
 
 /// Channel receiver used to notify the hook on how to handle keyboard events.
 static HOOK_RESPONSE_RX: RwLock<Option<Receiver<KeyAction>>> = RwLock::new(None);
@@ -36,47 +37,16 @@ static HOOK_CONTROL_RX: RwLock<Option<Receiver<ControlFlow>>> = RwLock::new(None
 /// Bitmask object representing all pressed keys on keyboard.
 static KEYBOARD_STATE: OnceLock<Mutex<KeyboardState>> = OnceLock::new();
 
-/// Enum representing how to handle keypress.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum KeyAction {
-    Allow,
-    Block,
-    Replace,
-}
-
-/// Enum representing control flow signals for the hook thread.
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum ControlFlow {
-    Exit,
-}
-
-/// Enum representing keyboard events.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum KeyboardEvent {
-    KeyDown {
-        /// The virtual key code of the key.
-        vk_code: u16,
-        /// The updated keyboard state due to this event.
-        keyboard_state: KeyboardState,
-    },
-    KeyUp {
-        /// The virtual key code of the key.
-        key_code: u16,
-        /// The updated keyboard state due to this event.
-        keyboard_state: KeyboardState,
-    },
-}
-
 /// Struct representing the keyboard hook interface
 pub struct KeyboardHook {
-    ke_rx: Receiver<KeyboardEvent>,
+    ke_rx: Receiver<KeyboardInputEvent>,
     action_tx: Sender<KeyAction>,
     cf_tx: Sender<ControlFlow>,
 }
 
 impl KeyboardHook {
     /// Receives a keyboard event from the hook.
-    pub fn recv(&self) -> Result<KeyboardEvent, RecvError> {
+    pub fn recv(&self) -> Result<KeyboardInputEvent, RecvError> {
         self.ke_rx.recv()
     }
 
@@ -211,7 +181,7 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
                 while let Ok(_) = response_rx.try_recv() {}
                 update_keyboard_state(vk_code);
                 event_tx
-                    .send(KeyboardEvent::KeyDown {
+                    .send(KeyboardInputEvent::KeyDown {
                         vk_code,
                         keyboard_state: *KEYBOARD_STATE.get().unwrap().lock().unwrap(),
                     })
