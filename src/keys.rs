@@ -17,9 +17,10 @@ macro_rules! vkeys_definition {
                 #[cfg_attr(feature = "serde", serde(alias = stringify!($value)$(,alias = $alias)?))]
                 $name = $value.0,
             )*
+            /// the scan code of the key has no mapping
             None = VK__none_.0,
             #[num_enum(catch_all)]
-            CustomKeyCode(u16),
+            UnknownOrReserved(u16),
         }
 
         impl VKey {
@@ -234,7 +235,7 @@ impl VKey {
     /// - [Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
     ///
     pub fn to_vk_code(&self) -> u16 {
-        (*self).into()
+        u16::from(*self)
     }
 
     /// Returns a `VKey` based a Windows Virtual-Key (VK) code.
@@ -266,13 +267,12 @@ impl std::str::FromStr for VKey {
     }
 }
 
+impl Eq for VKey {}
 impl PartialEq<VKey> for VKey {
     fn eq(&self, other: &VKey) -> bool {
         self.to_vk_code() == other.to_vk_code()
     }
 }
-
-impl Eq for VKey {}
 
 impl Hash for VKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -286,11 +286,11 @@ mod tests {
 
     #[test]
     fn test_to_vk_code() {
-        assert_eq!(VKey::Back.to_vk_code(), 0x08); // VK_BACK
-        assert_eq!(VKey::Return.to_vk_code(), 0x0D); // VK_RETURN
-        assert_eq!(VKey::Space.to_vk_code(), 0x20); // VK_SPACE
-        assert_eq!(VKey::F12.to_vk_code(), 0x7B); // VK_F12
-        assert_eq!(VKey::CustomKeyCode(1234).to_vk_code(), 1234); // Custom key
+        assert_eq!(VKey::Back.to_vk_code(), VK_BACK.0);
+        assert_eq!(VKey::Return.to_vk_code(), VK_RETURN.0);
+        assert_eq!(VKey::Space.to_vk_code(), VK_SPACE.0);
+        assert_eq!(VKey::F12.to_vk_code(), VK_F12.0);
+        assert_eq!(VKey::UnknownOrReserved(1234).to_vk_code(), 1234); // Unknown key
     }
 
     #[test]
@@ -298,9 +298,11 @@ mod tests {
         assert_eq!(VKey::from_keyname("BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_keyname("VK_BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_keyname("RETURN").unwrap(), VKey::Return);
+        assert_eq!(VKey::from_keyname("0x29").unwrap(), VKey::Select);
+        assert_eq!(VKey::from_keyname("0x29").unwrap(), VKey::UnknownOrReserved(0x29));
         assert_eq!(
-            VKey::from_keyname("0x29").unwrap(),
-            VKey::CustomKeyCode(0x29)
+            VKey::from_keyname("0xff1").unwrap(),
+            VKey::UnknownOrReserved(0xff1)
         );
         assert!(VKey::from_keyname("INVALID_KEY").is_err());
     }
@@ -325,13 +327,19 @@ mod tests {
     #[test]
     fn test_partial_eq() {
         assert_eq!(VKey::Back, VKey::Back); // Identical keys
-        assert_eq!(VKey::CustomKeyCode(1234), VKey::CustomKeyCode(1234)); // Same custom key
-        assert_ne!(VKey::CustomKeyCode(1234), VKey::CustomKeyCode(5678)); // Different custom keys
+        assert_eq!(
+            VKey::UnknownOrReserved(1234),
+            VKey::UnknownOrReserved(1234)
+        ); // Same key
+        assert_ne!(
+            VKey::UnknownOrReserved(1234),
+            VKey::UnknownOrReserved(5678)
+        ); // Different keys
     }
 
     #[test]
     fn test_custom_keycode_range() {
-        assert_eq!(VKey::CustomKeyCode(0).to_vk_code(), 0);
-        assert_eq!(VKey::CustomKeyCode(65535).to_vk_code(), 65535); // Maximum value for u16
+        assert_eq!(VKey::UnknownOrReserved(0).to_vk_code(), 0);
+        assert_eq!(VKey::UnknownOrReserved(65535).to_vk_code(), 65535); // Maximum value for u16
     }
 }

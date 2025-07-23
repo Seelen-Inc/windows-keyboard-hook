@@ -11,8 +11,8 @@ fn main() {
     let vk_a3 = VKey::from_vk_code(0x41);
     let vk_a4 = VKey::from_vk_code(VK_A.0);
 
-    // Create custom keycode equivalent to A
-    let vk_a5 = VKey::CustomKeyCode(0x41);
+    // do not use this variant, instead use `from_vk_code`, btw this will be equivalent
+    let vk_a5 = VKey::UnknownOrReserved(0x41);
 
     assert_eq!(vk_a1, vk_a2);
     assert_eq!(vk_a1, vk_a3);
@@ -20,7 +20,7 @@ fn main() {
     assert_eq!(vk_a1, vk_a5);
 
     // NOTE
-    // When matching `CustomKeyCodes` you must include a guard if statement
+    // When matching `UnknownOrReserved` you must include a guard if statement
     match vk_a5 {
         VKey::A => {
             // This will never show up
