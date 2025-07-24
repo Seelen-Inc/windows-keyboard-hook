@@ -42,5 +42,5 @@ fn main() {
 
     // Run the event handler in a blocking loop. This will block forever and execute the set
     // callbacks when the registered hotkeys are detected
-    hkm.event_loop();
+    let _ = hkm.event_loop();
 }

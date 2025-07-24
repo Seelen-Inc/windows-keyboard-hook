@@ -299,7 +299,10 @@ mod tests {
         assert_eq!(VKey::from_keyname("VK_BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_keyname("RETURN").unwrap(), VKey::Return);
         assert_eq!(VKey::from_keyname("0x29").unwrap(), VKey::Select);
-        assert_eq!(VKey::from_keyname("0x29").unwrap(), VKey::UnknownOrReserved(0x29));
+        assert_eq!(
+            VKey::from_keyname("0x29").unwrap(),
+            VKey::UnknownOrReserved(0x29)
+        );
         assert_eq!(
             VKey::from_keyname("0xff1").unwrap(),
             VKey::UnknownOrReserved(0xff1)
@@ -327,14 +330,9 @@ mod tests {
     #[test]
     fn test_partial_eq() {
         assert_eq!(VKey::Back, VKey::Back); // Identical keys
-        assert_eq!(
-            VKey::UnknownOrReserved(1234),
-            VKey::UnknownOrReserved(1234)
-        ); // Same key
-        assert_ne!(
-            VKey::UnknownOrReserved(1234),
-            VKey::UnknownOrReserved(5678)
-        ); // Different keys
+        assert_eq!(VKey::UnknownOrReserved(1234), VKey::UnknownOrReserved(1234)); // Same key
+        assert_ne!(VKey::UnknownOrReserved(1234), VKey::UnknownOrReserved(5678));
+        // Different keys
     }
 
     #[test]

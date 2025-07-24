@@ -42,7 +42,7 @@ fn main() {
     // Run HotkeyManager in background thread
     let handle = hkm.interrupt_handle();
     thread::spawn(move || {
-        hkm.event_loop();
+        let _ = hkm.event_loop();
     });
 
     // App Logic

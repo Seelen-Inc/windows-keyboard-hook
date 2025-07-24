@@ -3,20 +3,22 @@
 //! and releases, tracks the state of modifier keys, and communicates events
 //! via channels to the rest of the application.
 
-use crate::events::{ControlFlow, KeyAction, KeyboardInputEvent};
+use crate::error::{Result, WHKError};
+use crate::events::{KeyAction, KeyboardInputEvent};
 use crate::state::KeyboardState;
-use crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
-use std::sync::{Mutex, OnceLock, RwLock};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
     VIRTUAL_KEY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
-    UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+    CallNextHookEx, DispatchMessageW, GetMessageW, PostThreadMessageW, SetWindowsHookExW,
+    TranslateMessage, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_QUIT, WM_SYSKEYDOWN,
 };
 
 /// Timeout for blocking key events, measured in milliseconds.
@@ -25,106 +27,104 @@ const TIMEOUT: Duration = Duration::from_millis(250);
 /// Unassigned Virtual Key code used to suppress Windows Key events.
 const SILENT_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
-/// Channel sender used by hook proc to send keyboard events.
-pub static HOOK_EVENT_TX: RwLock<Option<Sender<KeyboardInputEvent>>> = RwLock::new(None);
-
-/// Channel receiver used to notify the hook on how to handle keyboard events.
-static HOOK_RESPONSE_RX: RwLock<Option<Receiver<KeyAction>>> = RwLock::new(None);
-
-/// Channel receiver used to notify hook proc to exit.
-static HOOK_CONTROL_RX: RwLock<Option<Receiver<ControlFlow>>> = RwLock::new(None);
-
 /// Bitmask object representing all pressed keys on keyboard.
-static KEYBOARD_STATE: OnceLock<Mutex<KeyboardState>> = OnceLock::new();
+static KEYBOARD_STATE: LazyLock<Arc<Mutex<KeyboardState>>> = LazyLock::new(|| {
+    let mutex = Mutex::new(KeyboardState::new());
+    Arc::new(mutex)
+});
 
-/// Struct representing the keyboard hook interface
-pub struct KeyboardHook {
-    ke_rx: Receiver<KeyboardInputEvent>,
-    action_tx: Sender<KeyAction>,
-    cf_tx: Sender<ControlFlow>,
-}
+static STARTED: AtomicBool = AtomicBool::new(false);
+static HOOK_THREAD_ID: AtomicU32 = AtomicU32::new(0);
 
-impl KeyboardHook {
-    /// Receives a keyboard event from the hook.
-    pub fn recv(&self) -> Result<KeyboardInputEvent, RecvError> {
-        self.ke_rx.recv()
+/// Starts the keyboard hook thread.
+pub fn start() -> Result<()> {
+    if STARTED.load(Ordering::Relaxed) {
+        return Ok(());
     }
-
-    /// Blocks or unblocks the propagation of the key event.
-    pub fn key_action(&self, value: KeyAction) {
-        self.action_tx.send(value).unwrap();
-    }
-
-    /// Signals the hook thread to exit.
-    pub fn exit(&self) {
-        self.cf_tx.send(ControlFlow::Exit).unwrap();
-    }
-}
-
-/// Starts the keyboard hook in a separate thread.
-///
-/// # Returns
-/// A `KeyboardHook` instance to interact with the hook (e.g., receiving events, blocking keys).
-pub fn start() -> KeyboardHook {
-    // Create channels
-    let (ke_tx, ke_rx) = unbounded();
-    let (action_tx, action_rx) = unbounded();
-    let (cf_tx, cf_rx) = unbounded();
-
-    // Set static channel variables
-    let mut hook_event_tx = HOOK_EVENT_TX.write().unwrap();
-    *hook_event_tx = Some(ke_tx);
-    let mut hook_response_rx = HOOK_RESPONSE_RX.write().unwrap();
-    *hook_response_rx = Some(action_rx);
-    let mut hook_control_tx = HOOK_CONTROL_RX.write().unwrap();
-    *hook_control_tx = Some(cf_rx);
 
     // Create/clear keyboard state
-    let mutex = KEYBOARD_STATE.get_or_init(|| Mutex::new(KeyboardState::new()));
-    let mut state = mutex.lock().unwrap();
-    state.clear();
+    KEYBOARD_STATE.lock().unwrap().clear();
 
+    let (tx, rx) = crossbeam_channel::unbounded::<bool>();
+    thread::spawn(move || unsafe {
+        let Ok(_hhook) = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), None, 0) else {
+            tx.send(false).unwrap();
+            return;
+        };
+
+        tx.send(true).unwrap();
+        HOOK_THREAD_ID.store(GetCurrentThreadId(), Ordering::Relaxed);
+
+        let mut msg = MSG::default();
+        while GetMessageW(&mut msg, None, 0, 0).into() {
+            let _ = TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    });
+
+    if rx.recv()? {
+        STARTED.store(true, Ordering::Relaxed);
+        Ok(())
+    } else {
+        Err(WHKError::StartupFailed)
+    }
+}
+
+pub fn stop() {
+    let thread_id = HOOK_THREAD_ID.load(Ordering::Relaxed);
+    if !STARTED.load(Ordering::Relaxed) || thread_id == 0 {
+        return;
+    }
     unsafe {
-        thread::spawn(|| {
-            let hhook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), None, 0).unwrap();
-            if let Some(cf_rx) = &*HOOK_CONTROL_RX.read().unwrap() {
-                loop {
-                    let mut msg = MSG::default();
-                    if GetMessageW(&mut msg, None, 0, 0).into() {
-                        let _ = TranslateMessage(&msg);
-                        DispatchMessageW(&msg);
-                    }
+        let _ = PostThreadMessageW(thread_id, WM_QUIT, WPARAM::default(), LPARAM::default());
+    }
+}
 
-                    if let Ok(cf) = cf_rx.try_recv() {
-                        match cf {
-                            ControlFlow::Exit => {
-                                let mut hook_event_tx = HOOK_EVENT_TX.write().unwrap();
-                                *hook_event_tx = None;
-                                let mut hook_response_rx = HOOK_RESPONSE_RX.write().unwrap();
-                                *hook_response_rx = None;
-                                let mut hook_control_tx = HOOK_CONTROL_RX.write().unwrap();
-                                *hook_control_tx = None;
-                                UnhookWindowsHookEx(hhook).unwrap();
-                                break;
-                            }
+/// Hook procedure for handling keyboard events.
+unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code >= 0 {
+        let event_type = wparam.0 as u32;
+        let vk_code = (*(lparam.0 as *const KBDLLHOOKSTRUCT)).vkCode as u16;
+        if vk_code == SILENT_KEY.0 {
+            return CallNextHookEx(None, code, wparam, lparam);
+        }
+
+        match event_type {
+            // We only care about key down events
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                let response_rx = KeyAction::reciever();
+                // Clear the actions channel of any previous action
+                while response_rx.try_recv().is_ok() {}
+
+                update_keyboard_state(vk_code);
+                KeyboardInputEvent::send(KeyboardInputEvent::KeyDown {
+                    vk_code,
+                    keyboard_state: *KEYBOARD_STATE.lock().unwrap(),
+                });
+
+                // Wait for response on how to handle event
+                if let Ok(action) = response_rx.recv_timeout(TIMEOUT) {
+                    match action {
+                        KeyAction::Block => {
+                            return LRESULT(1);
                         }
+                        KeyAction::Replace => {
+                            send_silent_key();
+                            return LRESULT(1);
+                        }
+                        KeyAction::Allow => {}
                     }
                 }
             }
-        });
+            _ => {}
+        };
     }
-
-    KeyboardHook {
-        ke_rx,
-        action_tx,
-        cf_tx,
-    }
+    CallNextHookEx(None, code, wparam, lparam)
 }
 
 /// Updates global keyboard state for given virtual key code.
 fn update_keyboard_state(vk_code: u16) {
-    let mutex = KEYBOARD_STATE.get();
-    let mut keyboard = mutex.unwrap().lock().unwrap();
+    let mut keyboard = KEYBOARD_STATE.lock().unwrap();
     keyboard.sync();
     keyboard.keydown(vk_code);
 }
@@ -158,51 +158,4 @@ unsafe fn send_silent_key() {
         },
     ];
     SendInput(&inputs, size_of::<INPUT>() as i32);
-}
-
-/// Hook procedure for handling keyboard events.
-unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if code >= 0 {
-        let event_guard = HOOK_EVENT_TX.read().unwrap();
-        let event_tx = event_guard.as_ref().unwrap();
-        let response_guard = HOOK_RESPONSE_RX.read().unwrap();
-        let response_rx = response_guard.as_ref().unwrap();
-
-        let event_type = wparam.0 as u32;
-        let vk_code = (*(lparam.0 as *const KBDLLHOOKSTRUCT)).vkCode as u16;
-        if vk_code == SILENT_KEY.0 {
-            return CallNextHookEx(None, code, wparam, lparam);
-        }
-
-        match event_type {
-            // We only care about key down events
-            WM_KEYDOWN | WM_SYSKEYDOWN => {
-                // Clear the actions channel of any previous action
-                while let Ok(_) = response_rx.try_recv() {}
-                update_keyboard_state(vk_code);
-                event_tx
-                    .send(KeyboardInputEvent::KeyDown {
-                        vk_code,
-                        keyboard_state: *KEYBOARD_STATE.get().unwrap().lock().unwrap(),
-                    })
-                    .unwrap();
-
-                // Wait for response on how to handle event
-                if let Ok(action) = response_rx.recv_timeout(TIMEOUT) {
-                    match action {
-                        KeyAction::Block => {
-                            return LRESULT(1);
-                        }
-                        KeyAction::Replace => {
-                            send_silent_key();
-                            return LRESULT(1);
-                        }
-                        KeyAction::Allow => {}
-                    }
-                }
-            }
-            _ => {}
-        };
-    }
-    CallNextHookEx(None, code, wparam, lparam)
 }

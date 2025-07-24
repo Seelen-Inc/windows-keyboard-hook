@@ -45,5 +45,5 @@ fn main() {
     })
     .unwrap();
 
-    hkm.event_loop();
+    let _ = hkm.event_loop();
 }

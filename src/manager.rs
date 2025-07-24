@@ -2,8 +2,8 @@
 //! unregistration, and execution of hotkeys. It also handles the main event
 //! loop that listens for keyboard events and invokes associated callbacks.
 
-use crate::error::WHKError;
 use crate::error::WHKError::RegistrationFailed;
+use crate::error::{Result, WHKError};
 use crate::events::{KeyAction, KeyboardInputEvent};
 use crate::hook;
 use crate::hotkey::Hotkey;
@@ -116,47 +116,52 @@ impl<T> HotkeyManager<T> {
     ///
     /// This method blocks and processes keyboard events until interrupted.
     /// It matches events against registered hotkeys and executes the corresponding callbacks.
-    pub fn event_loop(&mut self) {
-        let hook = hook::start();
+    pub fn event_loop(&mut self) -> Result<()> {
+        hook::start()?;
         while !self.interrupt.load(Ordering::Relaxed) {
-            if let Ok(event) = hook.recv() {
-                let (key_code, state) = match event {
-                    KeyboardInputEvent::KeyDown {
-                        vk_code: key_code,
-                        keyboard_state: state,
-                    } => (key_code, state),
-                    _ => continue,
-                };
+            let Ok(event) = KeyboardInputEvent::recv() else {
+                continue;
+            };
 
-                let mut found = false;
-                if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
-                    for hotkey in hotkeys {
-                        if self.paused.load(Ordering::Relaxed)
-                            && !self.paused_ids.contains(&hotkey.generate_id())
-                        {
-                            continue;
+            let (key_code, state) = match event {
+                KeyboardInputEvent::KeyDown {
+                    vk_code: key_code,
+                    keyboard_state: state,
+                } => (key_code, state),
+                _ => continue,
+            };
+
+            let mut found = false;
+            if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
+                for hotkey in hotkeys {
+                    if self.paused.load(Ordering::Relaxed)
+                        && !self.paused_ids.contains(&hotkey.generate_id())
+                    {
+                        continue;
+                    }
+
+                    if hotkey.is_trigger_state(state) {
+                        if state.is_down(VKey::LWin.to_vk_code()) {
+                            KeyAction::send(KeyAction::Replace);
+                        } else {
+                            KeyAction::send(KeyAction::Block);
                         }
-                        if hotkey.is_trigger_state(state) {
-                            if state.is_down(VKey::LWin.to_vk_code()) {
-                                hook.key_action(KeyAction::Replace);
-                            } else {
-                                hook.key_action(KeyAction::Block);
-                            }
-                            let result = hotkey.callback();
-                            if let Some(callback_result_channel) = &self.callback_results_channel {
-                                callback_result_channel.send(result).unwrap();
-                            }
-                            found = true;
-                            break;
+                        let result = hotkey.callback();
+                        if let Some(callback_result_channel) = &self.callback_results_channel {
+                            callback_result_channel.send(result).unwrap();
                         }
+                        found = true;
+                        break;
                     }
                 }
-                if !found {
-                    hook.key_action(KeyAction::Allow);
-                }
+            }
+
+            if !found {
+                KeyAction::send(KeyAction::Allow);
             }
         }
-        hook.exit();
+        hook::stop();
+        Ok(())
     }
 
     /// Signals the `HotkeyManager` to interrupt its event loop.
@@ -190,17 +195,12 @@ impl InterruptHandle {
     /// This method sets an internal flag to indicate that the interruption has been requested.
     /// then sends a dummy keyboard event to the event loop to force it to check the flag.
     pub fn interrupt(&self) {
-        use crate::hook::HOOK_EVENT_TX;
-
         let dummy_event = KeyboardInputEvent::KeyDown {
             vk_code: 0,
             keyboard_state: KeyboardState::new(),
         };
         self.interrupt.store(true, Ordering::Relaxed);
-        let event_tx = HOOK_EVENT_TX.read().unwrap();
-        if let Some(ke_tx) = &*event_tx {
-            ke_tx.send(dummy_event).unwrap();
-        }
+        KeyboardInputEvent::send(dummy_event);
     }
 }
 

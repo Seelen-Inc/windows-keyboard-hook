@@ -22,7 +22,7 @@ fn main() {
     })
     .unwrap();
 
-    hkm.event_loop();
+    let _ = hkm.event_loop();
 }
 
 fn show_popup(title: &str, message: &str) {
