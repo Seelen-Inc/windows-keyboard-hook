@@ -6,7 +6,7 @@ use crate::error::WHKError::RegistrationFailed;
 use crate::error::{Result, WHKError};
 use crate::events::{KeyAction, KeyboardInputEvent};
 use crate::hook;
-use crate::hotkey::Hotkey;
+use crate::hotkey::{Hotkey, LOCK_SCREEN_SHORTCUT, SECURITY_SCREEN_SHORTCUT};
 use crate::state::KeyboardState;
 use crate::VKey;
 use crossbeam_channel::Sender;
@@ -51,7 +51,7 @@ impl<T> HotkeyManager<T> {
         &mut self,
         trigger_key: VKey,
         mod_keys: &[VKey],
-        callback: impl Fn() -> T + Send + 'static,
+        callback: impl Fn() -> T + Send + Sync + 'static,
     ) -> Result<i32, WHKError> {
         let hotkey = Hotkey::new(trigger_key, mod_keys, callback);
         let id = hotkey.generate_id();
@@ -94,7 +94,7 @@ impl<T> HotkeyManager<T> {
         &mut self,
         trigger_key: VKey,
         mod_keys: &[VKey],
-        callback: impl Fn() -> T + Send + 'static,
+        callback: impl Fn() -> T + Send + Sync + 'static,
     ) -> Result<i32, WHKError> {
         let paused = Arc::clone(&self.paused);
         let wrapped_callback = move || {
@@ -131,6 +131,16 @@ impl<T> HotkeyManager<T> {
                 _ => continue,
             };
 
+            if LOCK_SCREEN_SHORTCUT.is_trigger_state(&state) {
+                LOCK_SCREEN_SHORTCUT.callback();
+                continue;
+            }
+
+            if SECURITY_SCREEN_SHORTCUT.is_trigger_state(&state) {
+                SECURITY_SCREEN_SHORTCUT.callback();
+                continue;
+            }
+
             let mut found = false;
             if let Some(hotkeys) = self.hotkeys.get_mut(&key_code) {
                 for hotkey in hotkeys {
@@ -140,7 +150,7 @@ impl<T> HotkeyManager<T> {
                         continue;
                     }
 
-                    if hotkey.is_trigger_state(state) {
+                    if hotkey.is_trigger_state(&state) {
                         if state.is_down(VKey::LWin.to_vk_code()) {
                             KeyAction::send(KeyAction::Replace);
                         } else {

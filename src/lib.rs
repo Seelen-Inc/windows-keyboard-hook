@@ -12,6 +12,7 @@ pub mod hotkey;
 mod keys;
 mod manager;
 pub mod state;
+mod utils;
 
 pub use keys::*;
 pub use manager::*;

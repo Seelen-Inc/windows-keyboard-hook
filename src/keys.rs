@@ -229,6 +229,26 @@ vkeys_definition! {
 }
 
 impl VKey {
+    pub fn is_windows_key(&self) -> bool {
+        matches!(self, VKey::LWin | VKey::RWin)
+    }
+
+    pub fn is_shift_key(&self) -> bool {
+        matches!(self, VKey::LShift | VKey::RShift | VKey::Shift)
+    }
+
+    pub fn is_menu_key(&self) -> bool {
+        matches!(self, VKey::LMenu | VKey::RMenu | VKey::Menu)
+    }
+
+    pub fn is_control_key(&self) -> bool {
+        matches!(self, VKey::LControl | VKey::RControl | VKey::Control)
+    }
+
+    pub fn is_modifier_key(&self) -> bool {
+        self.is_windows_key() || self.is_shift_key() || self.is_menu_key() || self.is_control_key()
+    }
+
     /// Converts a `VKey` to its corresponding Windows Virtual-Key (VK) code.
     ///
     /// # See Also
@@ -269,6 +289,12 @@ impl std::str::FromStr for VKey {
 
 impl Eq for VKey {}
 impl PartialEq<VKey> for VKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_vk_code() == other.to_vk_code()
+    }
+}
+
+impl PartialEq<VKey> for &VKey {
     fn eq(&self, other: &VKey) -> bool {
         self.to_vk_code() == other.to_vk_code()
     }
@@ -295,7 +321,11 @@ mod tests {
 
     #[test]
     fn test_from_keyname() {
+        assert_eq!(VKey::from_keyname("a").unwrap(), VKey::A);
+        assert_eq!(VKey::from_keyname("A").unwrap(), VKey::A);
+        assert_eq!(VKey::from_keyname("5").unwrap(), VKey::Vk5);
         assert_eq!(VKey::from_keyname("BACK").unwrap(), VKey::Back);
+        assert_eq!(VKey::from_keyname("BaCk").unwrap(), VKey::Back); // Case-insensitive
         assert_eq!(VKey::from_keyname("VK_BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_keyname("RETURN").unwrap(), VKey::Return);
         assert_eq!(VKey::from_keyname("0x29").unwrap(), VKey::Select);
@@ -324,7 +354,7 @@ mod tests {
         use std::str::FromStr;
         assert_eq!(VKey::from_str("BACK").unwrap(), VKey::Back);
         assert_eq!(VKey::from_str("VK_BACK").unwrap(), VKey::Back);
-        assert_eq!(VKey::from_str("INVALID_KEY").is_err(), true);
+        assert!(VKey::from_str("INVALID_KEY").is_err());
     }
 
     #[test]
