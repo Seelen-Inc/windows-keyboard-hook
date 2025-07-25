@@ -54,7 +54,7 @@ macro_rules! vkeys_definition {
                     None => {
                         let mut vk_name = key_name.to_ascii_uppercase();
                         if !vk_name.starts_with("VK_") {
-                            vk_name = format!("VK_{}", key_name);
+                            vk_name = format!("VK_{}", vk_name);
                         }
                         vk_name
                     },
