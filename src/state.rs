@@ -223,7 +223,7 @@ mod tests {
         assert!(!keyboard.is_down(65), "Key 65 should be cleared");
         assert!(!keyboard.is_down(70), "Key 70 should be cleared");
         assert_eq!(
-            keyboard.pressing[1],
+            keyboard.pressing[0],
             VKey::from_vk_code(129),
             "Key 129 should remain set"
         );
