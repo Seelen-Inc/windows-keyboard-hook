@@ -1,28 +1,28 @@
 use std::{thread, time};
-use win_hotkeys::HotkeyManager;
-use win_hotkeys::VKey;
+use win_hotkeys::{Hotkey, HotkeyManager, VKey};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_OK};
 
 fn main() {
-    let mut hkm = HotkeyManager::new();
+    let hkm = HotkeyManager::current();
 
-    hkm.register_hotkey(VKey::P, &[VKey::Control], || {
+    hkm.register_hotkey(Hotkey::new(VKey::P, [VKey::Control], || {
         show_popup("Pomodoro Timer", "Pomodoro started! Focus for 25 minutes.");
         thread::spawn(|| {
             thread::sleep(time::Duration::from_secs(25 * 60));
             show_popup("Pomodoro Timer", "Time's up! Take a break.");
         });
-    })
+    }))
     .unwrap();
 
-    hkm.register_hotkey(VKey::S, &[VKey::Control], || {
+    hkm.register_hotkey(Hotkey::new(VKey::S, [VKey::Control], || {
         show_popup("Pomodoro Timer", "Pomodoro stopped!");
-    })
+    }))
     .unwrap();
 
-    let _ = hkm.event_loop();
+    let event_loop_thread = HotkeyManager::start_keyboard_capturing().unwrap();
+    event_loop_thread.join().unwrap(); // Block until the event loop thread exits
 }
 
 fn show_popup(title: &str, message: &str) {

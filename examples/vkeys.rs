@@ -1,10 +1,9 @@
-use win_hotkeys::HotkeyManager;
-use win_hotkeys::VKey;
+use win_hotkeys::{Hotkey, HotkeyManager, VKey};
 use windows::Win32::UI::Input::KeyboardAndMouse::VK_A;
 
 fn main() {
     // Create HotkeyManager
-    let mut hkm = HotkeyManager::<()>::new();
+    let hkm = HotkeyManager::current();
 
     let vk_a1 = VKey::A;
     let vk_a2 = VKey::from_keyname("a").unwrap();
@@ -40,10 +39,13 @@ fn main() {
         _ => {}
     }
 
-    hkm.register_hotkey(vk_a5, &[], || {
+    hkm.register_hotkey(Hotkey::new(vk_a5, [], || {
         println!("You pressed A");
-    })
+    }))
     .unwrap();
 
-    let _ = hkm.event_loop();
+    HotkeyManager::start_keyboard_capturing()
+        .unwrap()
+        .join()
+        .unwrap();
 }

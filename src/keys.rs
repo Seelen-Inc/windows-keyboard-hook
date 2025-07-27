@@ -306,6 +306,18 @@ impl Hash for VKey {
     }
 }
 
+impl PartialOrd for VKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for VKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_vk_code().cmp(&other.to_vk_code())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

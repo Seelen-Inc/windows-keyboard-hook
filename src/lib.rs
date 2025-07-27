@@ -8,11 +8,12 @@
 pub mod error;
 pub mod events;
 pub mod hook;
-pub mod hotkey;
+mod hotkey;
 mod keys;
 mod manager;
 pub mod state;
 mod utils;
 
+pub use hotkey::*;
 pub use keys::*;
 pub use manager::*;

@@ -38,7 +38,7 @@ static HOOK_THREAD_ID: AtomicU32 = AtomicU32::new(0);
 /// Starts the keyboard hook thread.
 pub fn start() -> Result<()> {
     if STARTED.load(Ordering::Relaxed) {
-        return Ok(());
+        return Err(WHKError::AlreadyStarted);
     }
 
     // Create/clear keyboard state
@@ -115,7 +115,11 @@ unsafe extern "system" fn power_sleep_resume_proc(
 unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 {
         let event_type = wparam.0 as u32;
-        let vk_code = (*(lparam.0 as *const KBDLLHOOKSTRUCT)).vkCode as u16;
+        let Some(event_data) = (lparam.0 as *const KBDLLHOOKSTRUCT).as_ref() else {
+            return CallNextHookEx(None, code, wparam, lparam);
+        };
+
+        let vk_code = event_data.vkCode as u16;
         if vk_code == SILENT_KEY.0 {
             return CallNextHookEx(None, code, wparam, lparam);
         }

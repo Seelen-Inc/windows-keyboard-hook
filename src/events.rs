@@ -4,17 +4,35 @@ use crossbeam_channel::{Receiver, Sender};
 
 use crate::{log_on_dev, state::KeyboardState};
 
-static KIE_CHANNEL: LazyLock<(Sender<KeyboardInputEvent>, Receiver<KeyboardInputEvent>)> =
+static EVENT_LOOP_CHANNEL: LazyLock<(Sender<EventLoopEvent>, Receiver<EventLoopEvent>)> =
     LazyLock::new(crossbeam_channel::unbounded);
 
 static ACTION_CHANNEL: LazyLock<(Sender<KeyAction>, Receiver<KeyAction>)> =
     LazyLock::new(crossbeam_channel::unbounded);
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventLoopEvent {
+    Stop,
+    Keyboard(KeyboardInputEvent),
+}
+
+impl EventLoopEvent {
+    pub(crate) fn send(event: Self) {
+        if EVENT_LOOP_CHANNEL.0.send(event).is_err() {
+            log_on_dev!("Failed to send event");
+        }
+    }
+
+    pub(crate) fn reciever() -> Receiver<EventLoopEvent> {
+        EVENT_LOOP_CHANNEL.1.clone()
+    }
+}
+
 /// Enum representing keyboard input events.
 ///
 /// **note**: This doesn't represent the real hardware event, as hooks on high priority
 /// can override the pressed keys.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyboardInputEvent {
     KeyDown {
         /// The virtual key code of the key.
@@ -31,14 +49,8 @@ pub enum KeyboardInputEvent {
 }
 
 impl KeyboardInputEvent {
-    pub fn send(event: Self) {
-        if KIE_CHANNEL.0.send(event).is_err() {
-            log_on_dev!("Failed to send keyboard event");
-        }
-    }
-
-    pub fn recv() -> Result<KeyboardInputEvent, crossbeam_channel::RecvError> {
-        KIE_CHANNEL.1.recv()
+    pub(crate) fn send(event: Self) {
+        EventLoopEvent::send(EventLoopEvent::Keyboard(event));
     }
 }
 
@@ -51,13 +63,13 @@ pub enum KeyAction {
 }
 
 impl KeyAction {
-    pub fn send(action: Self) {
+    pub(crate) fn send(action: Self) {
         if ACTION_CHANNEL.0.send(action).is_err() {
             log_on_dev!("Failed to send key action");
         }
     }
 
-    pub fn reciever() -> Receiver<KeyAction> {
+    pub(crate) fn reciever() -> Receiver<KeyAction> {
         ACTION_CHANNEL.1.clone()
     }
 }

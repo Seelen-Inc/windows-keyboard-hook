@@ -1,7 +1,7 @@
-use crossbeam_channel::unbounded;
-use std::thread;
-use win_hotkeys::HotkeyManager;
-use win_hotkeys::VKey;
+use std::sync::LazyLock;
+
+use crossbeam_channel::{Receiver, Sender};
+use win_hotkeys::{Hotkey, HotkeyManager, VKey};
 
 enum AppCommand {
     AppCommand1,
@@ -9,46 +9,48 @@ enum AppCommand {
     Exit,
 }
 
+static COMMAND_CHANNEL: LazyLock<(Sender<AppCommand>, Receiver<AppCommand>)> =
+    LazyLock::new(crossbeam_channel::unbounded);
+
+fn send_command(command: AppCommand) {
+    COMMAND_CHANNEL.0.send(command).unwrap();
+}
+
 fn main() {
     // The HotkeyManager is generic over the return type of the callback functions.
-    let mut hkm = HotkeyManager::new();
+    let hkm = HotkeyManager::current();
+
     let modifiers = &[VKey::LWin, VKey::Shift];
 
     // Register WIN + SHIFT + 1 for app command 1
-    hkm.register_hotkey(VKey::Vk1, modifiers, || {
+    hkm.register_hotkey(Hotkey::new(VKey::Vk1, modifiers, || {
         println!("Pressed WIN + SHIFT + 1");
-        AppCommand::AppCommand1
-    })
+        send_command(AppCommand::AppCommand1);
+    }))
     .unwrap();
 
     // Register WIN + SHIFT + 2 for app command 2
-    hkm.register_hotkey(VKey::Vk2, modifiers, || {
+    hkm.register_hotkey(Hotkey::new(VKey::Vk2, modifiers, || {
         println!("Pressed WIN + SHIFT + 2");
-        AppCommand::AppCommand2
-    })
+        send_command(AppCommand::AppCommand2);
+    }))
     .unwrap();
 
     // Register WIN + 3 for app command EXIT
-    hkm.register_hotkey(VKey::Vk3, modifiers, || {
-        println!("Pressed WIN + SHIFT + 3");
-        AppCommand::Exit
-    })
+    hkm.register_hotkey(
+        Hotkey::new(VKey::Vk3, modifiers, || {
+            println!("Pressed WIN + SHIFT + 3");
+            send_command(AppCommand::Exit);
+        })
+        .bypass_pause(), // allow exit inclusively if hotkeys are paused
+    )
     .unwrap();
 
-    // Register channel to receive events from the hkm event loop
-    let (tx, rx) = unbounded();
-    hkm.register_channel(tx);
-
     // Run HotkeyManager in background thread
-    let handle = hkm.interrupt_handle();
-    thread::spawn(move || {
-        let _ = hkm.event_loop();
-    });
+    HotkeyManager::start_keyboard_capturing().unwrap();
 
     // App Logic
-    loop {
-        let command = rx.recv().unwrap();
-
+    while let Ok(command) = COMMAND_CHANNEL.1.recv() {
         match command {
             AppCommand::AppCommand1 => {
                 println!("Do thing 1");
@@ -58,7 +60,7 @@ fn main() {
             }
             AppCommand::Exit => {
                 println!("Exiting...");
-                handle.interrupt();
+                HotkeyManager::stop_keyboard_capturing();
                 break;
             }
         }

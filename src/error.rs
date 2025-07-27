@@ -7,10 +7,12 @@ use thiserror::Error;
 /// An enumeration of errors that may occur while using the crate.
 #[derive(Error, Debug)]
 pub enum WHKError {
+    #[error("Hotkey manager thread is already started.")]
+    AlreadyStarted,
     #[error("Failed to start hook thread.")]
     StartupFailed,
     #[error("Hotkey registration failed. Hotkey is already in use.")]
-    RegistrationFailed,
+    HotKeyAlreadyRegistered,
     #[error("Invalid key name `{0}`")]
     InvalidKey(String),
     // crossbeam
@@ -18,11 +20,19 @@ pub enum WHKError {
     SendFailed,
     #[error("Receiving event failed")]
     RecvFailed(#[from] crossbeam_channel::RecvError),
+    #[error("Mutext lock error (poisoned)")]
+    LockError,
 }
 
 impl<T> From<crossbeam_channel::SendError<T>> for WHKError {
     fn from(_err: crossbeam_channel::SendError<T>) -> Self {
         WHKError::SendFailed
+    }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for WHKError {
+    fn from(_err: std::sync::PoisonError<T>) -> Self {
+        WHKError::LockError
     }
 }
 

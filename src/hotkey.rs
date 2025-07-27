@@ -2,59 +2,65 @@
 //! A hotkey is composed of a trigger key, one or more modifier keys, and a callback function
 //! that is executed when the hotkey is triggered.
 
-use crate::state::{KeyboardState, KEYBOARD_STATE};
-use crate::{log_on_dev, VKey};
-use std::collections::HashSet;
+use crate::state::KeyboardState;
+use crate::VKey;
+use std::collections::BTreeSet;
 use std::fmt;
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::LazyLock;
+use std::hash::{Hash, Hasher};
 
-pub static LOCK_SCREEN_SHORTCUT: LazyLock<Hotkey<()>> = LazyLock::new(|| {
-    Hotkey::new(VKey::L, &[VKey::LWin], || {
-        log_on_dev!("Locking screen");
-        KEYBOARD_STATE.lock().unwrap().request_syncronization();
-    })
-});
-
-pub static SECURITY_SCREEN_SHORTCUT: LazyLock<Hotkey<()>> = LazyLock::new(|| {
-    Hotkey::new(VKey::Delete, &[VKey::Control, VKey::Menu], || {
-        log_on_dev!("Security screen");
-        KEYBOARD_STATE.lock().unwrap().request_syncronization();
-    })
-});
-
-/// Represents a keyboard hotkey.
-///
-/// A `Hotkey` includes a trigger key, a set of modifier keys, and a callback function that runs
-/// when the hotkey is activated.
-///
-/// # Type Parameters
-/// - `T`: The return type of the callback function.
-pub struct Hotkey<T> {
-    trigger_key: VKey,
-    modifiers: Vec<VKey>,
-    callback: Box<dyn Fn() -> T + Send + Sync + 'static>,
+/// Defines what should happen with the key event after hotkey triggers
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TriggerBehavior {
+    /// Allow the key event to propagate to other applications
+    PassThrough,
+    /// Consume the key event and prevent further processing
+    StopPropagation,
 }
 
-impl<T> Hotkey<T> {
+/// Represents a keyboard shortcut that triggers an action
+pub struct Hotkey {
+    /// key that must be pressed to trigger this hotkey
+    pub trigger_key: VKey,
+    /// keys that must be pressed before the trigger key ex: [CTRL] + [A]
+    pub modifiers: BTreeSet<VKey>,
+    /// action to perform when this hotkey is triggered
+    pub behaviour: TriggerBehavior,
+    /// will ignore the `paused` global state
+    pub bypass_pause: bool,
+    /// callback function to execute when this hotkey is triggered
+    pub callback: Box<dyn Fn() + Send + Sync + 'static>,
+}
+
+impl Hotkey {
     /// Creates a new `Hotkey` instance.
-    pub fn new(
-        trigger_key: VKey,
-        modifiers: &[VKey],
-        callback: impl Fn() -> T + Send + Sync + 'static,
-    ) -> Hotkey<T> {
+    pub fn new<M, F>(trigger_key: VKey, modifiers: M, callback: F) -> Hotkey
+    where
+        M: AsRef<[VKey]>,
+        F: Fn() + Send + Sync + 'static,
+    {
         Self {
             trigger_key,
-            modifiers: modifiers.to_vec(),
+            behaviour: TriggerBehavior::StopPropagation,
+            bypass_pause: false,
+            modifiers: modifiers.as_ref().iter().cloned().collect(),
             callback: Box::new(callback),
         }
     }
 
+    /// Sets the behavior when hotkey triggers
+    pub fn behavior(mut self, action: TriggerBehavior) -> Self {
+        self.behaviour = action;
+        self
+    }
+
+    /// Makes the hotkey work even when global hotkeys are paused
+    pub fn bypass_pause(mut self) -> Self {
+        self.bypass_pause = true;
+        self
+    }
+
     /// Executes the callback associated with the hotkey.
-    ///
-    /// # Returns
-    /// The result of the callback function.
-    pub fn callback(&self) -> T {
+    pub fn execute(&self) {
         (self.callback)()
     }
 
@@ -62,13 +68,12 @@ impl<T> Hotkey<T> {
     /// This should only be called if the most recent keypress is the
     /// trigger key for the hotkey.
     pub fn is_trigger_state(&self, state: &KeyboardState) -> bool {
-        // ignore trigger key validation if it is a modifier (standalone windows key as example)
+        // For non-modifier keys, verify the last pressed key matches
         if !self.trigger_key.is_modifier_key() {
             let Some(last_pressed) = state.pressing.last() else {
                 return false;
             };
 
-            // Check if the last pressed key is the trigger key
             if *last_pressed != self.trigger_key {
                 return false;
             }
@@ -76,39 +81,21 @@ impl<T> Hotkey<T> {
 
         let expected_state = self.generate_expected_keyboard_state();
 
+        // Verify all required non-modifier keys are pressed
         for key in &expected_state.pressing {
-            // Ignore control, menu, shift, and windows keys
-            // since they are handled separately
-            if key.is_modifier_key() {
-                continue;
-            }
-
-            if !state.is_down(*key) {
+            if !key.is_modifier_key() && !state.is_down(*key) {
                 return false;
             }
         }
 
-        // Ensure no extra modifiers are pressed
+        // Verify modifier key states match exactly
         expected_state.is_win_pressed() == state.is_win_pressed()
             && expected_state.is_menu_pressed() == state.is_menu_pressed()
             && expected_state.is_shift_pressed() == state.is_shift_pressed()
             && expected_state.is_control_pressed() == state.is_control_pressed()
     }
 
-    /// Generates a unique ID for the hotkey.
-    ///
-    /// The ID is computed based on the trigger key and modifiers using a hash function.
-    pub fn generate_id(&self) -> i32 {
-        let mut hasher = DefaultHasher::new();
-        self.trigger_key.hash(&mut hasher);
-        self.modifiers.hash(&mut hasher);
-        let hash = hasher.finish();
-        (hash & 0xFFFF_FFFF) as i32
-    }
-
     /// Generates a `KeyboardState` representing the hotkey.
-    ///
-    /// This includes both the trigger key and all modifier keys.
     pub fn generate_expected_keyboard_state(&self) -> KeyboardState {
         let mut keyboard_state = KeyboardState::new();
         keyboard_state.keydown(self.trigger_key);
@@ -117,24 +104,36 @@ impl<T> Hotkey<T> {
         }
         keyboard_state
     }
+
+    /// Returns a hash representing the hotkey combination
+    pub fn as_hash(&self) -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
-impl<T> fmt::Debug for Hotkey<T> {
+impl fmt::Debug for Hotkey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Hotkey")
             .field("trigger_key", &self.trigger_key)
+            .field("trigger_action", &self.behaviour)
             .field("modifiers", &self.modifiers)
             .field("callback", &"<callback>")
             .finish()
     }
 }
 
-impl<T> Eq for Hotkey<T> {}
-impl<T> PartialEq for Hotkey<T> {
+impl Eq for Hotkey {}
+impl PartialEq for Hotkey {
     fn eq(&self, other: &Self) -> bool {
-        // ignore modifiers order
-        let a: HashSet<&VKey> = HashSet::from_iter(&self.modifiers);
-        let b: HashSet<&VKey> = HashSet::from_iter(&other.modifiers);
-        self.trigger_key == other.trigger_key && a == b
+        self.trigger_key == other.trigger_key && self.modifiers == other.modifiers
+    }
+}
+
+impl Hash for Hotkey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.trigger_key.hash(state);
+        self.modifiers.hash(state);
     }
 }
