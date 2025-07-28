@@ -4,7 +4,7 @@
 //! via channels to the rest of the application.
 
 use crate::error::{Result, WHKError};
-use crate::events::{KeyAction, KeyboardInputEvent};
+use crate::events::{EventLoopEvent, KeyAction, KeyboardInputEvent};
 use crate::log_on_dev;
 use crate::state::KEYBOARD_STATE;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -127,22 +127,18 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
         match event_type {
             // We only care about key down events
             WM_KEYDOWN | WM_SYSKEYDOWN => {
-                let keyboard_state = {
+                let state = {
                     let mut state = KEYBOARD_STATE.lock().unwrap();
                     state.keydown(vk_code);
                     state.clone()
                 };
-
-                log_on_dev!("{keyboard_state:?}");
+                log_on_dev!("{state:?}");
 
                 // Clear the actions channel of any previous action
                 let response_rx = KeyAction::reciever();
                 while response_rx.try_recv().is_ok() {}
 
-                KeyboardInputEvent::send(KeyboardInputEvent::KeyDown {
-                    vk_code,
-                    keyboard_state,
-                });
+                EventLoopEvent::Keyboard(KeyboardInputEvent::KeyDown { vk_code, state }).send();
 
                 // Wait for response on how to handle event
                 if let Ok(action) = response_rx.recv_timeout(TIMEOUT) {
@@ -159,9 +155,13 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
                 }
             }
             WM_KEYUP | WM_SYSKEYUP => {
-                let mut state = KEYBOARD_STATE.lock().unwrap();
-                state.keyup(vk_code);
+                let state = {
+                    let mut state = KEYBOARD_STATE.lock().unwrap();
+                    state.keydown(vk_code);
+                    state.clone()
+                };
                 log_on_dev!("{state:?}");
+                EventLoopEvent::Keyboard(KeyboardInputEvent::KeyUp { vk_code, state }).send();
             }
             _ => {}
         };

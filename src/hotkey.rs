@@ -7,6 +7,7 @@ use crate::VKey;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 /// Defines what should happen with the key event after hotkey triggers
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,10 +29,20 @@ pub struct Hotkey {
     /// will ignore the `paused` global state
     pub bypass_pause: bool,
     /// callback function to execute when this hotkey is triggered
-    pub callback: Box<dyn Fn() + Send + Sync + 'static>,
+    pub callback: Arc<Box<dyn Fn() + Send + Sync + 'static>>,
 }
 
 impl Hotkey {
+    fn base() -> Hotkey {
+        Hotkey {
+            trigger_key: VKey::None,
+            modifiers: BTreeSet::new(),
+            behaviour: TriggerBehavior::StopPropagation,
+            bypass_pause: false,
+            callback: Arc::new(Box::new(|| {})),
+        }
+    }
+
     /// Creates a new `Hotkey` instance.
     pub fn new<M, F>(trigger_key: VKey, modifiers: M, callback: F) -> Hotkey
     where
@@ -43,8 +54,28 @@ impl Hotkey {
             behaviour: TriggerBehavior::StopPropagation,
             bypass_pause: false,
             modifiers: modifiers.as_ref().iter().cloned().collect(),
-            callback: Box::new(callback),
+            callback: Arc::new(Box::new(callback)),
         }
+    }
+
+    /// last key is used as trigger
+    pub fn from_keys<T: AsRef<[VKey]>>(keys: T) -> Self {
+        let mut keys: Vec<VKey> = keys.as_ref().to_vec();
+        let mut hotkey = Hotkey::base();
+        if let Some(last_key) = keys.pop() {
+            hotkey = hotkey.trigger(last_key);
+        }
+        hotkey.modifiers(keys)
+    }
+
+    pub fn trigger(mut self, key: VKey) -> Self {
+        self.trigger_key = key;
+        self
+    }
+
+    pub fn modifiers<T: AsRef<[VKey]>>(mut self, keys: T) -> Self {
+        self.modifiers = keys.as_ref().iter().cloned().collect();
+        self
     }
 
     /// Sets the behavior when hotkey triggers
@@ -59,7 +90,15 @@ impl Hotkey {
         self
     }
 
-    /// Executes the callback associated with the hotkey.
+    pub fn action<F>(mut self, action: F) -> Self
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.callback = Arc::new(Box::new(action));
+        self
+    }
+
+    /// Executes the callback associated with the hotkey, in a separate thread.
     pub fn execute(&self) {
         (self.callback)()
     }

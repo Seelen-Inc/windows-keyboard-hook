@@ -17,8 +17,8 @@ pub enum EventLoopEvent {
 }
 
 impl EventLoopEvent {
-    pub(crate) fn send(event: Self) {
-        if EVENT_LOOP_CHANNEL.0.send(event).is_err() {
+    pub(crate) fn send(self) {
+        if EVENT_LOOP_CHANNEL.0.send(self).is_err() {
             log_on_dev!("Failed to send event");
         }
     }
@@ -38,20 +38,14 @@ pub enum KeyboardInputEvent {
         /// The virtual key code of the key.
         vk_code: u16,
         /// The updated keyboard state due to this event.
-        keyboard_state: KeyboardState,
+        state: KeyboardState,
     },
     KeyUp {
         /// The virtual key code of the key.
         vk_code: u16,
         /// The updated keyboard state due to this event.
-        keyboard_state: KeyboardState,
+        state: KeyboardState,
     },
-}
-
-impl KeyboardInputEvent {
-    pub(crate) fn send(event: Self) {
-        EventLoopEvent::send(EventLoopEvent::Keyboard(event));
-    }
 }
 
 /// Enum representing how to handle keypress.
@@ -63,8 +57,8 @@ pub enum KeyAction {
 }
 
 impl KeyAction {
-    pub(crate) fn send(action: Self) {
-        if ACTION_CHANNEL.0.send(action).is_err() {
+    pub(crate) fn send(self) {
+        if ACTION_CHANNEL.0.send(self).is_err() {
             log_on_dev!("Failed to send key action");
         }
     }

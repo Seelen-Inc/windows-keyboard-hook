@@ -2,8 +2,11 @@
 //! unregistration, and execution of hotkeys. It also handles the main event
 //! loop that listens for keyboard events and invokes associated callbacks.
 
-use crate::error::Result;
+use arc_swap::ArcSwapOption;
+
+use crate::client_executor::{self, run_on_executor_thread};
 use crate::error::WHKError::HotKeyAlreadyRegistered;
+use crate::error::{Result, WHKError};
 use crate::events::{EventLoopEvent, KeyAction, KeyboardInputEvent};
 use crate::hotkey::{Hotkey, TriggerBehavior};
 use crate::state::KEYBOARD_STATE;
@@ -14,22 +17,33 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
 type HotkeysMap = Arc<Mutex<HashMap<VKey, HashSet<Hotkey>>>>;
+type KeyboardCallback = dyn Fn(KeyboardInputEvent) + Send + Sync + 'static;
+type FreeKeyboardCallback = dyn Fn() + Send + Sync + 'static;
 
 static HOTKEYS: LazyLock<HotkeysMap> =
     LazyLock::new(|| Arc::new(Mutex::new(HotkeyManager::get_initial_hotkeys())));
+
 static PAUSED: AtomicBool = AtomicBool::new(false);
+static STEALING: AtomicBool = AtomicBool::new(false);
+
+static CLIENT_KEYBOARD_CALLBACK: ArcSwapOption<Box<KeyboardCallback>> =
+    ArcSwapOption::const_empty();
+static CLIENT_ON_FREE_KEYBOARD_CB: ArcSwapOption<Box<FreeKeyboardCallback>> =
+    ArcSwapOption::const_empty();
 
 /// Manages the hotkeys, including their registration, unregistration, and execution.
 ///
 /// The `HotkeyManager` listens for keyboard events and triggers the corresponding
 /// hotkey callbacks when events match registered hotkeys.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct HotkeyManager {
     /// stores the registered hotkeys
     hotkeys: HotkeysMap,
     /// indicates whether the hotkey manager is paused
     paused: &'static AtomicBool,
+    /// indicates whether the hotkey manager is in stealing mode
+    stealing: &'static AtomicBool,
 }
 
 impl HotkeyManager {
@@ -37,11 +51,41 @@ impl HotkeyManager {
         HotkeyManager {
             hotkeys: HOTKEYS.clone(),
             paused: &PAUSED,
+            stealing: &STEALING,
+        }
+    }
+
+    /// Returns whether the hotkey manager is in stealing mode.
+    pub fn is_stealing_mode(&self) -> bool {
+        self.stealing.load(Ordering::SeqCst)
+    }
+
+    /// Sets the stealing mode for the hotkey manager until the `ESC` key is pressed,
+    /// or client manually frees the keyboard.
+    pub fn steal_keyboard<F>(&self, on_free: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        log_on_dev!("Keyboard stealing mode enabled");
+        self.stealing.store(true, Ordering::SeqCst);
+        CLIENT_ON_FREE_KEYBOARD_CB.store(Some(Arc::new(Box::new(on_free))));
+    }
+
+    /// Disables the stealing mode for the hotkey manager.
+    pub fn free_keyboard(&self) {
+        log_on_dev!("Keyboard stealing mode disabled");
+        self.stealing.store(false, Ordering::SeqCst);
+        if let Some(on_free_cb) = CLIENT_ON_FREE_KEYBOARD_CB.swap(None) {
+            run_on_executor_thread(on_free_cb);
         }
     }
 
     /// Registers a new hotkey.
     pub fn register_hotkey(&self, hotkey: Hotkey) -> Result<u64> {
+        if hotkey.trigger_key == VKey::None {
+            return Err(WHKError::HotkeyInvalidTriggerKey(hotkey.trigger_key));
+        }
+
         let id = hotkey.as_hash();
         let was_already_inserted = !self
             .hotkeys
@@ -49,6 +93,7 @@ impl HotkeyManager {
             .entry(hotkey.trigger_key)
             .or_default()
             .insert(hotkey);
+
         if was_already_inserted {
             return Err(HotKeyAlreadyRegistered);
         }
@@ -74,8 +119,9 @@ impl HotkeyManager {
     /// It matches events against registered hotkeys and executes the corresponding callbacks.
     pub fn start_keyboard_capturing() -> Result<std::thread::JoinHandle<()>> {
         hook::start()?;
+        client_executor::start_executor_thread();
+
         let handle = std::thread::spawn(|| {
-            let paused_state = HotkeysPauseHandler::current();
             // clean event loop channel, to remove events before start
             while EventLoopEvent::reciever().try_recv().is_ok() {}
 
@@ -85,47 +131,69 @@ impl HotkeyManager {
                     EventLoopEvent::Keyboard(event) => event,
                 };
 
-                let KeyboardInputEvent::KeyDown {
-                    vk_code,
-                    keyboard_state: state,
-                } = event
-                else {
-                    continue;
-                };
-
-                if let Some(hotkeys) = HOTKEYS.lock().unwrap().get(&VKey::from(vk_code)) {
-                    'search: for hotkey in hotkeys {
-                        if paused_state.is_paused() && !hotkey.bypass_pause {
-                            continue 'search;
-                        }
-
-                        if !hotkey.is_trigger_state(&state) {
-                            continue 'search;
-                        }
-
-                        match hotkey.behaviour {
-                            TriggerBehavior::PassThrough => {
-                                KeyAction::send(KeyAction::Allow);
-                            }
-                            TriggerBehavior::StopPropagation => {
-                                if state.is_down(VKey::LWin) {
-                                    KeyAction::send(KeyAction::Replace);
-                                } else {
-                                    KeyAction::send(KeyAction::Block);
-                                }
-                            }
-                        }
-
-                        hotkey.execute();
-                        continue 'event_loop;
-                    }
-                }
-
-                // no hotkey matched, allow pass through
-                KeyAction::send(KeyAction::Allow);
+                let key_action = HotkeyManager::process_keyboard_event(event);
+                key_action.send();
             }
         });
+
         Ok(handle)
+    }
+
+    pub(crate) fn process_keyboard_event(event: KeyboardInputEvent) -> KeyAction {
+        if let Some(cb) = CLIENT_KEYBOARD_CALLBACK.load().as_ref() {
+            let cb = cb.clone();
+            let event = event.clone();
+            run_on_executor_thread(Arc::new(move || {
+                cb(event.clone());
+            }));
+        }
+
+        let KeyboardInputEvent::KeyDown { vk_code, state } = event else {
+            return KeyAction::Allow;
+        };
+
+        let manager = HotkeyManager::current();
+        let paused_state = HotkeysPauseHandler::current();
+
+        let is_stealing = manager.is_stealing_mode();
+        if is_stealing && VKey::from(vk_code) == VKey::Escape {
+            manager.free_keyboard();
+        }
+
+        // on ESC press we exit stealing mode, but still will block the ESC key
+        if is_stealing {
+            return if state.is_down(VKey::LWin) {
+                KeyAction::Replace
+            } else {
+                KeyAction::Block
+            };
+        }
+
+        if let Some(hotkeys) = HOTKEYS.lock().unwrap().get(&VKey::from(vk_code)) {
+            for hotkey in hotkeys {
+                if paused_state.is_paused() && !hotkey.bypass_pause {
+                    continue;
+                }
+
+                if !hotkey.is_trigger_state(&state) {
+                    continue;
+                }
+
+                run_on_executor_thread(hotkey.callback.clone());
+                return match hotkey.behaviour {
+                    TriggerBehavior::PassThrough => KeyAction::Allow,
+                    TriggerBehavior::StopPropagation => {
+                        if state.is_down(VKey::LWin) {
+                            KeyAction::Replace
+                        } else {
+                            KeyAction::Block
+                        }
+                    }
+                };
+            }
+        }
+
+        KeyAction::Allow
     }
 
     /// This gracefully interrupt the event loop by sending
@@ -134,6 +202,18 @@ impl HotkeyManager {
     pub fn stop_keyboard_capturing() {
         EventLoopEvent::send(EventLoopEvent::Stop);
         hook::stop();
+        client_executor::stop_executor_thread();
+    }
+
+    pub fn set_global_keyboard_listener<F>(&self, cb: F)
+    where
+        F: Fn(KeyboardInputEvent) + Send + Sync + 'static,
+    {
+        CLIENT_KEYBOARD_CALLBACK.store(Some(Arc::new(Box::new(cb))));
+    }
+
+    pub fn remove_global_keyboard_listener(&self) {
+        CLIENT_KEYBOARD_CALLBACK.store(None);
     }
 
     /// Signals the `HotkeyManager` to pause processing of hotkeys.

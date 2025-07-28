@@ -228,7 +228,12 @@ vkeys_definition! {
     Z = VK_Z,
 }
 
+#[allow(non_upper_case_globals)]
 impl VKey {
+    pub const LAlt: VKey = VKey::LMenu;
+    pub const Alt: VKey = VKey::Menu;
+    pub const RAlt: VKey = VKey::RMenu;
+
     pub fn is_windows_key(&self) -> bool {
         matches!(self, VKey::LWin | VKey::RWin)
     }

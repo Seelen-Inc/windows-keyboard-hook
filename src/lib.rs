@@ -5,6 +5,7 @@
 //! and handling keyboard events in a safe and efficient manner.
 #![cfg(windows)]
 
+mod client_executor;
 pub mod error;
 pub mod events;
 pub mod hook;

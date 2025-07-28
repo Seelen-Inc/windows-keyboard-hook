@@ -4,6 +4,8 @@
 
 use thiserror::Error;
 
+use crate::VKey;
+
 /// An enumeration of errors that may occur while using the crate.
 #[derive(Error, Debug)]
 pub enum WHKError {
@@ -13,6 +15,8 @@ pub enum WHKError {
     StartupFailed,
     #[error("Hotkey registration failed. Hotkey is already in use.")]
     HotKeyAlreadyRegistered,
+    #[error("Invalid trigger key `{0:?}`")]
+    HotkeyInvalidTriggerKey(VKey),
     #[error("Invalid key name `{0}`")]
     InvalidKey(String),
     // crossbeam
