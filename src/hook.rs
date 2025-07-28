@@ -157,7 +157,7 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
             WM_KEYUP | WM_SYSKEYUP => {
                 let state = {
                     let mut state = KEYBOARD_STATE.lock().unwrap();
-                    state.keydown(vk_code);
+                    state.keyup(vk_code);
                     state.clone()
                 };
                 log_on_dev!("{state:?}");
