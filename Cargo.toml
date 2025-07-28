@@ -41,4 +41,5 @@ serde = { version = "1.0.219", optional = true, features = ["derive"] }
 arc-swap = "1.7.1"
 
 [features]
-serde = ["dep:serde"] 
+serde = ["dep:serde"]
+verbose = []
