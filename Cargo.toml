@@ -13,14 +13,12 @@ edition = "2021"
 
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
-targets = [
-    "aarch64-pc-windows-msvc",
-    "i686-pc-windows-msvc",
-    "x86_64-pc-windows-msvc",
-]
+targets = ["aarch64-pc-windows-msvc", "i686-pc-windows-msvc", "x86_64-pc-windows-msvc"]
 
 [dev-dependencies]
 criterion = { version = "0.6.0", features = ["html_reports"] }
+serde_test = "*"
+serde_json = "*"
 
 [[bench]]
 name = "my_benchmark"
@@ -33,7 +31,7 @@ windows = { version = "0.60", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
     "Win32_System_Power",
-]}
+] }
 thiserror = "2.0.11"
 crossbeam-channel = "0.5.14"
 num_enum = "0.7.4"

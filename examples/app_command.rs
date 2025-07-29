@@ -23,14 +23,14 @@ fn main() {
     let modifiers = &[VKey::LWin, VKey::Shift];
 
     // Register WIN + SHIFT + 1 for app command 1
-    hkm.register_hotkey(Hotkey::new(VKey::Vk1, modifiers, || {
+    hkm.register_hotkey(Hotkey::new(VKey::Digit1, modifiers, || {
         println!("Pressed WIN + SHIFT + 1");
         send_command(AppCommand::AppCommand1);
     }))
     .unwrap();
 
     // Register WIN + SHIFT + 2 for app command 2
-    hkm.register_hotkey(Hotkey::new(VKey::Vk2, modifiers, || {
+    hkm.register_hotkey(Hotkey::new(VKey::Digit2, modifiers, || {
         println!("Pressed WIN + SHIFT + 2");
         send_command(AppCommand::AppCommand2);
     }))
@@ -38,7 +38,7 @@ fn main() {
 
     // Register WIN + 3 for app command EXIT
     hkm.register_hotkey(
-        Hotkey::new(VKey::Vk3, modifiers, || {
+        Hotkey::new(VKey::Digit3, modifiers, || {
             println!("Pressed WIN + SHIFT + 3");
             send_command(AppCommand::Exit);
         })
