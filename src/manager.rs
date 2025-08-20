@@ -110,7 +110,7 @@ impl HotkeyManager {
 
     /// Unregisters all hotkeys.
     pub fn unregister_all(&mut self) -> Result<()> {
-        self.hotkeys.lock()?.clear();
+        *self.hotkeys.lock()? = HotkeyManager::get_initial_hotkeys();
         Ok(())
     }
 
@@ -261,6 +261,9 @@ impl HotkeysPauseHandler {
 }
 
 impl HotkeyManager {
+    /// this functions returns a map of initial hotkeys,
+    /// these are no-overridable as they are important system hotkeys
+    /// like lock screen and security screen
     fn get_initial_hotkeys() -> HashMap<VKey, HashSet<Hotkey>> {
         let lock_screen_shortcut = Hotkey::new(VKey::L, [VKey::LWin], || {
             log_on_dev!("Locking screen");
