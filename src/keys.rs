@@ -109,7 +109,7 @@ vkeys_definition! {
     Return = VK_RETURN aliases ["Enter"],
     // 0x0E-0x0F Reserved
     Shift = VK_SHIFT,
-    Control = VK_CONTROL aliases ["Ctrl"],
+    Control = VK_CONTROL aliases ["Ctrl"] const Ctrl,
     Menu = VK_MENU aliases ["Alt"] const Alt,
     Pause = VK_PAUSE,
 
@@ -234,8 +234,8 @@ vkeys_definition! {
     // 0x97-9F Unassigned
     LShift = VK_LSHIFT,
     RShift = VK_RSHIFT,
-    LControl = VK_LCONTROL aliases ["LCtrl"],
-    RControl = VK_RCONTROL aliases ["RCtrl"],
+    LControl = VK_LCONTROL aliases ["LCtrl"] const LCtrl,
+    RControl = VK_RCONTROL aliases ["RCtrl"] const RCtrl,
     LMenu = VK_LMENU aliases ["LAlt"] const LAlt,
     RMenu = VK_RMENU aliases ["RAlt"] const RAlt,
 
